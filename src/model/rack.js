@@ -5,7 +5,7 @@
 // cooling unit at the bottom of the frame.
 // Frame origin: centre of the footprint on the floor, +z = front. Units: metres.
 import * as THREE from 'three';
-import { box, cyl, group, hose, finTexture, labelTexture, portTexture, textured } from '../kit.js';
+import { box, cyl, group, hose, finTexture, labelTexture, portTexture, textured, stripedWordmarkTexture, outlineLetterTexture } from '../kit.js';
 import { buildCpcDrawer, CPC } from './cpcDrawer.js';
 
 export const U = 0.04445;
@@ -122,35 +122,89 @@ export function buildRack(R, DP, HP) {
     frame.add(box(0.045, H - base, 0.045, R.black, sx * (W / 2 - 0.0225), (H + base) / 2 - 0.015, sz * (D / 2 - 0.0225), 'Corner post'));
     frame.add(cyl(0.035, 0.05, R.blackGloss, sx * (W / 2 - 0.07), 0.035, sz * (D / 2 - 0.09), 'x', 'Caster'));
   }
+  frame.add(box(W - 0.05, 0.06, 0.34, R.black, 0, H + 0.03, -D / 2 + 0.19, 'Top exit enclosure'));
   // 19-inch mounting rails
   for (const sx of [-1, 1]) for (const z of [Z_FRONT, -0.40]) frame.add(box(0.02, 42 * U, 0.004, R.zinc, sx * 0.235, uY(1) + 21 * U, z, 'EIA rail'));
   root.add(frame);
 
-  // ---- covers and doors
-  const sideL = box(0.012, H - base - 0.03, D - 0.02, DP.blackGloss, -W / 2 + 0.006, (H + base) / 2 - 0.015, 0, 'Side cover (left)');
-  const sideR = box(0.012, H - base - 0.03, D - 0.02, DP.blackGloss, W / 2 - 0.006, (H + base) / 2 - 0.015, 0, 'Side cover (right)');
-  root.add(sideL, sideR);
-
+  // ---- covers and doors (styled after the z16 cover set: four faceted panels on the front
+  //      door, four vertical cover strips per side with the striped wordmark)
   const doorH = H - 0.06;
   const mkPerf = (rx, ry) => { const m = DP.perf.clone(); m.alphaMap = DP._perfTex.clone(); m.alphaMap.wrapS = m.alphaMap.wrapT = THREE.RepeatWrapping; m.alphaMap.repeat.set(rx, ry); DP['_perf' + rx] = m; return m; };
-  // front door: hinged on the left, perforated acoustic face with the z16 angled panel and light bar
+  const decal = (tex) => { const m = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, metalness: 0.5, roughness: 0.45 }); DP['_decal' + Object.keys(DP).length] = m; return m; };
+  const wordmark = decal(stripedWordmarkTexture('IBM', '#74787e'));
+  const wordmarkChrome = decal(stripedWordmarkTexture('IBM', '#d5d9df'));
+  const zMark = decal(outlineLetterTexture('Z'));
+
+  const side = (sx) => {
+    const g = group(`Side covers (${sx < 0 ? 'left' : 'right'})`);
+    const n = 4, gap = 0.006, pd = (D - 0.02 - (n - 1) * gap) / n, ph = H - base - 0.03;
+    for (let i = 0; i < n; i++) g.add(box(0.014, ph, pd, DP.coverBlack, 0, 0, -D / 2 + 0.01 + pd / 2 + i * (pd + gap), 'Side cover strip'));
+    const logo = new THREE.Mesh(new THREE.PlaneGeometry(1.12, 0.40), wordmark);
+    logo.rotation.set(0, sx * Math.PI / 2, Math.PI / 2);
+    logo.position.set(sx * 0.0078, -ph / 2 + 0.63, sx < 0 ? -0.255 : -0.255);
+    logo.name = 'Wordmark';
+    g.add(logo);
+    g.position.set(sx * (W / 2 - 0.007), (H + base) / 2 - 0.015, 0);
+    return g;
+  };
+  const sideL = side(-1), sideR = side(1);
+  root.add(sideL, sideR);
+
+  // One faceted cover panel: a rounded square slab with a triangular recess whose base is the
+  // vertical centre line and whose apex points to `dir` (-1 left, +1 right). The upper facet
+  // reads dark, the lower light, and a blue sliver lines the centre.
+  const PS = 0.445, PT = 0.046;
+  const panel = (dir, name) => {
+    const g = group(name);
+    const r = 0.034, h = PS / 2, m = 0.012, bev = 0.004;
+    const sh = new THREE.Shape();
+    sh.moveTo(-h + r, -h); sh.lineTo(h - r, -h); sh.quadraticCurveTo(h, -h, h, -h + r); sh.lineTo(h, h - r);
+    sh.quadraticCurveTo(h, h, h - r, h); sh.lineTo(-h + r, h); sh.quadraticCurveTo(-h, h, -h, h - r); sh.lineTo(-h, -h + r); sh.quadraticCurveTo(-h, -h, -h + r, -h);
+    const A = [0, h - m], B = [0, -h + m], C = [dir * (h - m), 0], E = [-dir * 0.013, 0];
+    const hole = new THREE.Path();
+    hole.moveTo(...A); hole.lineTo(...C); hole.lineTo(...B); hole.lineTo(...E); hole.closePath();
+    sh.holes.push(hole);
+    const slab = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: PT - 2 * bev, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 3, curveSegments: 10 }), DP.cover);
+    slab.position.z = bev; slab.castShadow = slab.receiveShadow = true;
+    g.add(slab);
+    const zf = PT - bev * 0.5, Dp = [0, 0, PT - 0.04];
+    const tri = (pts, mat, nm) => {
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pts.flatMap((p) => (p.length === 3 ? p : [p[0], p[1], zf])), 3));
+      geo.computeVertexNormals();
+      const me = new THREE.Mesh(geo, mat); me.name = nm; me.receiveShadow = true;
+      g.add(me);
+    };
+    tri([A, C, Dp], DP.facetDark, 'Upper facet');
+    tri([C, B, Dp], DP.facetLight, 'Lower facet');
+    tri([A, Dp, E, Dp, B, E], DP.facetBlue, 'Blue accent');
+    g.add(box(PS - 0.01, PS - 0.01, 0.002, DP.coverBlack, 0, 0, 0.001, 'Back plate'));
+    // quadrant seam on the plain half
+    g.add(box(h - 0.03, 0.0016, 0.001, DP.coverBlack, -dir * (h / 2 + 0.008), 0, PT + 0.0002, 'Seam'));
+    return g;
+  };
+
+  // front door: hinged on the left
   const front = new THREE.Group(); front.name = 'Front door';
   front.position.set(-W / 2, 0.05, D / 2);
   const fd = group('Door leaf');
   fd.position.x = W / 2;
-  fd.add(box(W, doorH, 0.03, DP.black, 0, doorH / 2, 0.035, 'Door frame'));
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(W - 0.07, doorH - 0.12), mkPerf(60, 110));
-  mesh.position.set(0.012, doorH / 2, 0.066); fd.add(mesh);
-  fd.add(box(W - 0.05, doorH - 0.10, 0.012, DP.blackGloss, 0.012, doorH / 2, 0.056, 'Acoustic panel'));
-  // angular z16 styling: a slanted gloss panel and a vertical blue light bar
-  const shape = new THREE.Shape([new THREE.Vector2(0, 0), new THREE.Vector2(0.20, 0), new THREE.Vector2(0.20, 0.52), new THREE.Vector2(0, 0.78)]);
-  const slant = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.012, bevelEnabled: false }), DP.blackGloss);
-  slant.position.set(-W / 2 + 0.02, doorH - 0.80, 0.062); slant.castShadow = true;
-  fd.add(slant);
-  fd.add(box(0.008, doorH - 0.14, 0.006, DP.ibmBlue, -W / 2 + 0.014, doorH / 2, 0.070, 'Light bar'));
-  const badge = new THREE.Mesh(new THREE.PlaneGeometry(0.15, 0.0375), textured(DP, DP.blackGloss, labelTexture('IBM z16', { bg: '#0b0c0f', fg: '#f2f4f8' })));
-  badge.position.set(-W / 2 + 0.12, doorH - 0.14, 0.0745);
-  fd.add(badge);
+  fd.add(box(W, doorH, 0.03, DP.coverBlack, 0, doorH / 2, 0.035, 'Door'));
+  const pitch = PS + 0.03, y0 = (doorH - (4 * PS + 3 * 0.03)) / 2 + PS / 2, px = -0.0125;
+  for (let i = 0; i < 4; i++) {
+    const p = panel(i % 2 ? 1 : -1, `Cover panel ${i + 1}`);
+    p.position.set(px, y0 + (3 - i) * pitch, 0.05);
+    fd.add(p);
+    if (i === 0) {
+      const ibm = new THREE.Mesh(new THREE.PlaneGeometry(0.078, 0.028), wordmarkChrome);
+      ibm.position.set(0.125, 0.085, PT + 0.001); ibm.name = 'Wordmark badge';
+      const z = new THREE.Mesh(new THREE.PlaneGeometry(0.046, 0.046), zMark);
+      z.position.set(-0.175, -0.165, PT + 0.001); z.name = 'Z badge';
+      p.add(ibm, z);
+    }
+  }
+  fd.add(group('Latch', box(0.026, 0.085, 0.012, DP.blackGloss, W / 2 - 0.04, y0 + 1.5 * pitch, 0.056), box(0.012, 0.04, 0.008, DP.cover, W / 2 - 0.04, y0 + 1.5 * pitch - 0.012, 0.064)));
   front.add(fd);
   root.add(front);
 

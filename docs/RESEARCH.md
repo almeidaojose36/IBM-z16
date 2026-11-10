@@ -84,9 +84,9 @@ IBM does not publish mechanical drawings, so these are estimates from photograph
 rack dimensions, not measurements:
 
 - Frame outer size (600 × 1070 × 2015 mm) and drawer depths (CPC 800 mm, I/O 700 mm).
-- The front door. It is a stylised stand-in, not the real z16 cover. If you have the rights to
-  use the Printables STL, import it in Blender over `out/ibm-z16-a-frame.glb` and hide the
-  `Front door` node.
+- The covers. The front door (four faceted panels with the blue accent) and the side cover
+  strips are modelled by eye from IBM's product photographs. Panel size, recess depth and the
+  striped wordmark are approximations, not traced artwork.
 - The radiator unit occupies A01–A09 in the model; the Redbook only says it is at the bottom.
 - Exact slot positions of fanouts, SMP9 connectors and I/O card types, hose routing, the number
   of POL/VRM cards shown, and the DIMM bank spacing.

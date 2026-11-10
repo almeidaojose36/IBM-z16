@@ -86,6 +86,49 @@ export function labelTexture(text, { w = 512, h = 128, bg = '#0c0f13', fg = '#e9
   return finish(c);
 }
 
+/**
+ * Eight-bar striped wordmark on a transparent background (use with alphaTest).
+ * Drawn from a bold slab/serif face and cut into bars; an approximation of the logo on the covers.
+ */
+export function stripedWordmarkTexture(text = 'IBM', color = '#7d8187') {
+  // Letters are built from slab shapes on an 8-row grid, then cut into eight bars.
+  const TW = 22.4, S = 48, W = Math.round(TW * S), H = 8 * S;
+  const [c, g] = canvas(W, H);
+  g.fillStyle = color;
+  const R = (x, y, w, h, r = 0) => { g.beginPath(); g.roundRect(x * S, y * S, w * S, h * S, Array.isArray(r) ? r.map((v) => v * S) : r * S); g.fill(); };
+  const poly = (...p) => { g.beginPath(); p.forEach(([x, y], i) => (i ? g.lineTo(x * S, y * S) : g.moveTo(x * S, y * S))); g.closePath(); g.fill(); };
+  const cut = (x, y, w, h, r = 0) => { g.save(); g.globalCompositeOperation = 'destination-out'; R(x, y, w, h, r); g.restore(); };
+  // I
+  R(0, 0, 5, 2); R(0, 6, 5, 2); R(1.4, 0, 2.2, 8);
+  // B
+  const bx = 5.9;
+  R(bx, 0, 6.6, 4.2, [0, 1.9, 1.9, 0]); R(bx, 3.8, 7.0, 4.2, [0, 2.0, 2.0, 0]);
+  cut(bx + 3.5, 1.17, 1.3, 1.66); cut(bx + 3.5, 5.17, 1.5, 1.66);
+  cut(bx, 2, 1.4, 4); cut(bx + 6.2, 3.55, 1, 0.9);
+  // M
+  const mx = 13.8, mw = 8.6;
+  R(mx, 0, 2.9, 2); R(mx + mw - 2.9, 0, 2.9, 2); R(mx, 6, 3.6, 2); R(mx + mw - 3.6, 6, 3.6, 2);
+  R(mx + 0.9, 0, 1.9, 8); R(mx + mw - 2.8, 0, 1.9, 8);
+  poly([mx + 1.4, 0], [mx + 2.9, 0], [mx + mw / 2 + 0.55, 6.3], [mx + mw / 2 - 0.55, 6.3]);
+  poly([mx + mw - 1.4, 0], [mx + mw - 2.9, 0], [mx + mw / 2 - 0.55, 6.3], [mx + mw / 2 + 0.55, 6.3]);
+  // eight bars: gaps centred on the row boundaries
+  g.globalCompositeOperation = 'destination-out';
+  for (let i = 1; i < 8; i++) g.fillRect(0, (i - 0.17) * S, W, 0.34 * S);
+  return finish(c);
+}
+
+/** Outlined single letter (the "Z" on the top cover panel). */
+export function outlineLetterTexture(ch = 'Z', color = '#c9cdd3') {
+  const [c, g] = canvas(256, 256);
+  g.font = '700 230px "Helvetica Neue", Arial, sans-serif';
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 14; g.strokeStyle = color; g.lineJoin = 'miter';
+  g.strokeText(ch, 128, 140);
+  g.globalCompositeOperation = 'destination-out';
+  g.fillText(ch, 128, 140);
+  return finish(c);
+}
+
 /** Faceplate with a row of ports: kind = 'rj45' | 'lc' | 'qsfp'. */
 export function portTexture(n, kind = 'lc', label = '') {
   const [c, g] = canvas(1024, 96);
@@ -204,6 +247,11 @@ export function makePalette() {
     led: std({ color: 0x39d98a, emissive: 0x39d98a, emissiveIntensity: 2.0 }),
     perf: std({ color: 0x15171b, metalness: 0.7, roughness: 0.5, alphaMap: perf, alphaTest: 0.5, side: THREE.DoubleSide }),
     perfSteel: std({ color: 0x565c64, metalness: 0.85, roughness: 0.45, alphaMap: perf, alphaTest: 0.5, side: THREE.DoubleSide }),
+    cover: std({ color: 0x2a2c2f, metalness: 0.25, roughness: 0.7 }),
+    coverBlack: std({ color: 0x0d0e10, metalness: 0.3, roughness: 0.6 }),
+    facetDark: std({ color: 0x17181b, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide }),
+    facetLight: std({ color: 0x74777c, metalness: 0.55, roughness: 0.5, side: THREE.DoubleSide }),
+    facetBlue: std({ color: 0x0a3fd0, emissive: 0x0b45e0, emissiveIntensity: 0.55, roughness: 0.4, side: THREE.DoubleSide }),
     silicon: std({ color: 0x3d4350, metalness: 0.9, roughness: 0.22 }),
     _perfTex: perf,
   };

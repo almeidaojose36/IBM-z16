@@ -148,6 +148,17 @@ window.__exportGlb = async (t = 0) => {
   return btoa(s);
 };
 window.__scene = { scene, camera, rack, story };
+// exterior still from an arbitrary camera, overlay hidden, stage filling the viewport
+window.__beauty = (pos, look) => {
+  stage.style.cssText = 'width:100vw;height:100vh;left:0;top:0;transform:none';
+  resize();
+  setTime(0);
+  $('overlay').style.display = $('lines').style.display = $('shade').style.display = 'none';
+  camera.fov = 24; camera.position.set(...pos); camera.lookAt(...look);
+  camera.near = 0.1; camera.updateProjectionMatrix();
+  renderer.render(scene, camera);
+  return true;
+};
 window.__ready = true;
 
 // ---- interactive playback

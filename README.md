@@ -57,6 +57,7 @@ quick 720p, 24 fps version.
 Other tools:
 
 - `node tools/stills.mjs --times 3,45,77` writes JPEG stills to `out/stills/` (thumbnails).
+- `node tools/beauty.mjs` writes caption-free exterior shots (front and both three-quarter views) to `out/exterior/`.
 - `node tools/export-glb.mjs --t 0` writes `out/ibm-z16-a-frame.glb` for Blender. Every part is a
   named node. `--t 57` exports the exploded drawer, `--t 72` the opened DCM.
 
@@ -75,7 +76,7 @@ Other tools:
 ## Accuracy
 
 Counts, positions and specifications follow the *IBM z16 (3931) Technical Guide* (SG24-8951).
-Outer dimensions, the door styling and fine detail are estimates from photographs, because IBM
+Outer dimensions, the cover styling and fine detail are estimates from photographs, because IBM
 does not publish mechanical drawings. `docs/RESEARCH.md` lists which is which.
 
 This is an independent educational model. It is not affiliated with or endorsed by IBM. IBM,
