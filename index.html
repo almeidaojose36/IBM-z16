@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IBM z16 Teardown</title>
+<link rel="icon" href="data:,">
+<style>
+  :root { --ink: #f2f4f8; --dim: #a8b0bd; --accent: #4589ff; --panel: rgba(13, 16, 22, .78); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #07090c; overflow: hidden; }
+  body { font-family: "IBM Plex Sans", "Helvetica Neue", Helvetica, Arial, sans-serif; color: var(--ink); }
+  /* 16:9 stage, letterboxed. All overlay sizes are in --u (1% of stage height) so any render size matches. */
+  #stage { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: min(100vw, 177.778vh); height: min(100vh, 56.25vw); --u: min(1vh, .5625vw); overflow: hidden; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #overlay, #lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  #lines line { stroke: #fff; stroke-opacity: .85; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+  #lines circle { fill: var(--accent); stroke: #fff; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+
+  .callout { position: absolute; transform: translate(-50%, -50%); padding: calc(var(--u) * 1) calc(var(--u) * 1.6);
+    background: var(--panel); border-left: calc(var(--u) * .45) solid var(--accent); white-space: nowrap;
+    backdrop-filter: blur(6px); }
+  .callout b { display: block; font-size: calc(var(--u) * 2.9); font-weight: 600; letter-spacing: .01em; }
+  .callout span { display: block; font-size: calc(var(--u) * 2.15); color: var(--dim); margin-top: calc(var(--u) * .3); }
+
+  #caption { position: absolute; left: calc(var(--u) * 6); bottom: calc(var(--u) * 6.5); max-width: calc(var(--u) * 110); }
+  #caption .kicker, #title .kicker { font-size: calc(var(--u) * 1.9); letter-spacing: .18em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+  #caption h2 { margin: calc(var(--u) * .8) 0 calc(var(--u) * .9); font-size: calc(var(--u) * 5.2); font-weight: 300; line-height: 1.08; text-wrap: balance; }
+  #caption p { margin: 0; font-size: calc(var(--u) * 2.35); color: var(--dim); line-height: 1.4; max-width: calc(var(--u) * 90); }
+  #shade { position: absolute; left: 0; right: 0; bottom: 0; height: 42%; background: linear-gradient(to top, rgba(4, 6, 9, .82), rgba(4, 6, 9, 0)); }
+
+  #title { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding-left: calc(var(--u) * 9);
+    background: linear-gradient(to right, rgba(4, 6, 9, .88) 0%, rgba(4, 6, 9, .55) 38%, rgba(4, 6, 9, 0) 70%); }
+  #title h1 { margin: calc(var(--u) * 1) 0; font-size: calc(var(--u) * 15); font-weight: 200; letter-spacing: -.02em; line-height: 1; }
+  #title p { margin: 0; font-size: calc(var(--u) * 3.4); color: var(--dim); font-weight: 300; }
+
+  #ui { position: fixed; left: 0; right: 0; bottom: 0; display: flex; gap: 12px; align-items: center; padding: 10px 14px;
+    background: rgba(10, 12, 16, .9); font-size: 13px; z-index: 5; }
+  #ui button, #ui label { background: #1c2129; color: var(--ink); border: 1px solid #343b47; border-radius: 6px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  #ui input[type=range] { flex: 1; accent-color: var(--accent); }
+  #ui output { font-variant-numeric: tabular-nums; min-width: 86px; text-align: right; color: var(--dim); }
+  body.render #ui { display: none; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./node_modules/three/build/three.module.js", "three/addons/": "./node_modules/three/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="stage">
+  <canvas id="view"></canvas>
+  <div id="shade"></div>
+  <svg id="lines"></svg>
+  <div id="overlay">
+    <div id="title"><div class="kicker"></div><h1></h1><p></p></div>
+    <div id="caption"><div class="kicker"></div><h2></h2><p></p></div>
+  </div>
+</div>
+<div id="ui">
+  <button id="play">Pause</button>
+  <input id="scrub" type="range" min="0" max="96" step="0.01" value="0">
+  <output id="clock">0.00 / 96 s</output>
+  <label><input id="free" type="checkbox"> Free camera</label>
+  <button id="glb">Export .glb</button>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

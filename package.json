@@ -1,0 +1,17 @@
+{
+  "name": "ibm-z16-teardown",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Procedural 3D teardown animation of the IBM z16 (3931 A01) mainframe, rendered with three.js",
+  "scripts": {
+    "start": "node tools/serve.mjs",
+    "render": "node tools/render-video.mjs",
+    "render:preview": "node tools/render-video.mjs --width 1280 --height 720 --fps 24 --out out/z16-teardown-preview.mp4",
+    "export:glb": "node tools/export-glb.mjs"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "three": "0.170.0"
+  }
+}
