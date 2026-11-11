@@ -37,9 +37,10 @@ function buildIoDrawer(P) {
     roce: textured(P, P.zinc, portTexture(2, 'qsfp', 'RoCE')),
     crypto: textured(P, P.zinc, labelTexture('Crypto Express8S', { w: 1024, h: 96, bg: '#b9bec4', fg: '#16181b', font: '600 44px Arial' })),
     sw: textured(P, P.zinc, portTexture(1, 'qsfp', 'PCIe+ SW')),
+    cpl: textured(P, P.zinc, portTexture(2, 'lc', 'Coupling LR')),
     bmc: textured(P, P.zinc, portTexture(1, 'rj45', 'BMC')),
   };
-  const kinds = ['fc', 'osa', 'crypto', 'fc', 'sw', 'bmc', 'roce', 'fc', 'osa', 'fc'];
+  const kinds = ['fc', 'osa', 'crypto', 'cpl', 'sw', 'bmc', 'roce', 'fc', 'osa', 'fc'];
   const slotH = 0.0262, y0 = 0.075;
   for (const s of [-1, 1]) for (let i = 0; i < 10; i++) {
     const kind = kinds[s < 0 ? i : 9 - i];
@@ -60,6 +61,7 @@ function buildIoDrawer(P) {
     root.add(p);
   }
   refs.crypto = refs.cards.find((c) => c.userData.kind === 'crypto' && c.position.x > 0);
+  refs.card = (kind, side = 1) => refs.cards.find((c) => c.userData.kind === kind && Math.sign(c.position.x) === side);
   return { group: root, refs, H };
 }
 
@@ -67,7 +69,9 @@ function buildIoDrawer(P) {
 function buildRadiator(P) {
   const W = 0.445, H = 9 * U - 0.008, D = 0.78;
   const root = group('Radiator cooling unit (RCU)');
-  root.add(box(W, 0.003, D, P.steel, 0, 0.0015, 0), box(W, 0.003, D, P.steel, 0, H, 0));
+  const refs = { fans: [], pumps: [] };
+  refs.top = box(W, 0.003, D, P.steel, 0, H, 0, 'RCU cover');
+  root.add(box(W, 0.003, D, P.steel, 0, 0.0015, 0), refs.top);
   root.add(box(0.003, H, D, P.steel, -W / 2, H / 2, 0), box(0.003, H, D, P.steel, W / 2, H / 2, 0));
   // three fan assemblies, three fans each (N+1)
   for (let c = 0; c < 3; c++) {
@@ -80,21 +84,23 @@ function buildRadiator(P) {
       fa.add(ring, disc, cyl(0.016, 0.01, P.black, 0, (r - 1) * 0.118, -0.004, 'z'));
     }
     fa.position.set((c - 1) * 0.142, H / 2, D / 2);
-    root.add(fa);
+    root.add(fa); refs.fans.push(fa);
   }
   // heat exchanger core
   const fins = textured(P, P.alu, finTexture([90, 1]));
-  root.add(box(W - 0.03, H - 0.05, 0.16, fins, 0, H / 2, D / 2 - 0.20, 'Radiator core (heat exchanger)'));
+  refs.core = box(W - 0.03, H - 0.05, 0.16, fins, 0, H / 2, D / 2 - 0.20, 'Radiator core (heat exchanger)');
+  root.add(refs.core);
   root.add(box(W - 0.02, H - 0.04, 0.30, P.black, 0, H / 2, -0.05, 'Plenum'));
   // two pumps (N+1) and the manifold at the rear
   for (const s of [-1, 1]) {
-    root.add(group(`Pump ${s < 0 ? 1 : 2}`,
+    const pump = group(`Pump ${s < 0 ? 1 : 2}`,
       cyl(0.036, 0.12, P.steelDark, s * 0.10, 0.11, -D / 2 + 0.07, 'z'),
       cyl(0.026, 0.05, P.alu, s * 0.10, 0.11, -D / 2 + 0.005, 'z'),
-      box(0.05, 0.03, 0.06, P.blue, s * 0.10, 0.165, -D / 2 + 0.07)));
+      box(0.05, 0.03, 0.06, P.blue, s * 0.10, 0.165, -D / 2 + 0.07));
+    root.add(pump); refs.pumps.push(pump);
   }
   root.add(cyl(0.014, 0.34, P.alu, 0, 0.25, -D / 2 + 0.03, 'x', 'Manifold assembly'));
-  return { group: root, H };
+  return { group: root, H, refs };
 }
 
 function oneU(P, name, face, depth = 0.5) {
@@ -103,30 +109,9 @@ function oneU(P, name, face, depth = 0.5) {
   return g;
 }
 
-/**
- * @param R   palette for everything that fades with the rack
- * @param DP  palette for the doors and side covers (fades separately)
- * @param HP  palette for the hero CPC drawer (never fades)
- */
-export function buildRack(R, DP, HP) {
+/** Front door (hinged group), and left / right side cover sets, styled after the z16 cover set. */
+export function buildCovers(DP) {
   const { W, H, D, base } = FRAME;
-  const root = group('IBM z16 A01 – A frame');
-  const refs = {};
-  R.perfGrille = (() => { const m = R.perfSteel.clone(); m.alphaMap = R._perfTex.clone(); m.alphaMap.wrapS = m.alphaMap.wrapT = THREE.RepeatWrapping; m.alphaMap.repeat.set(14, 12); return m; })();
-
-  // ---- structure
-  const frame = group('Frame');
-  frame.add(box(W, 0.06, D, R.black, 0, base - 0.03, 0, 'Base'));
-  frame.add(box(W, 0.03, D, R.black, 0, H - 0.015, 0, 'Top'));
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    frame.add(box(0.045, H - base, 0.045, R.black, sx * (W / 2 - 0.0225), (H + base) / 2 - 0.015, sz * (D / 2 - 0.0225), 'Corner post'));
-    frame.add(cyl(0.035, 0.05, R.blackGloss, sx * (W / 2 - 0.07), 0.035, sz * (D / 2 - 0.09), 'x', 'Caster'));
-  }
-  frame.add(box(W - 0.05, 0.06, 0.34, R.black, 0, H + 0.03, -D / 2 + 0.19, 'Top exit enclosure'));
-  // 19-inch mounting rails
-  for (const sx of [-1, 1]) for (const z of [Z_FRONT, -0.40]) frame.add(box(0.02, 42 * U, 0.004, R.zinc, sx * 0.235, uY(1) + 21 * U, z, 'EIA rail'));
-  root.add(frame);
-
   // ---- covers and doors (styled after the z16 cover set: four faceted panels on the front
   //      door, four vertical cover strips per side with the striped wordmark)
   const doorH = H - 0.06;
@@ -149,7 +134,6 @@ export function buildRack(R, DP, HP) {
     return g;
   };
   const sideL = side(-1), sideR = side(1);
-  root.add(sideL, sideR);
 
   // One faceted cover panel: a rounded square slab with a triangular recess whose base is the
   // vertical centre line and whose apex points to `dir` (-1 left, +1 right). The upper facet
@@ -206,7 +190,50 @@ export function buildRack(R, DP, HP) {
   }
   fd.add(group('Latch', box(0.026, 0.085, 0.012, DP.blackGloss, W / 2 - 0.04, y0 + 1.5 * pitch, 0.056), box(0.012, 0.04, 0.008, DP.cover, W / 2 - 0.04, y0 + 1.5 * pitch - 0.012, 0.064)));
   front.add(fd);
-  root.add(front);
+  return { sideL, sideR, front };
+}
+
+/** A closed frame seen from outside only: used for the extra frames of a multi-frame system. */
+export function buildShell(P, name) {
+  const { W, H, D, base } = FRAME;
+  const g = group(name);
+  g.add(box(W, 0.06, D, P.black, 0, base - 0.03, 0), box(W, 0.03, D, P.black, 0, H - 0.015, 0));
+  g.add(box(W - 0.03, H - base - 0.03, 0.02, P.coverBlack, 0, (H + base) / 2 - 0.015, -D / 2 + 0.01, 'Rear door'));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(cyl(0.035, 0.05, P.blackGloss, sx * (W / 2 - 0.07), 0.035, sz * (D / 2 - 0.09), 'x'));
+  const c = buildCovers(P);
+  g.add(c.sideL, c.sideR, c.front);
+  return g;
+}
+
+/**
+ * @param R   palette for everything that fades with the rack
+ * @param DP  palette for the doors and side covers (fades separately)
+ * @param HP  palette for the hero CPC drawer (never fades)
+ */
+export function buildRack(R, DP, HP) {
+  const { W, H, D, base } = FRAME;
+  const root = group('IBM z16 A01 – A frame');
+  const refs = {};
+  R.perfGrille = (() => { const m = R.perfSteel.clone(); m.alphaMap = R._perfTex.clone(); m.alphaMap.wrapS = m.alphaMap.wrapT = THREE.RepeatWrapping; m.alphaMap.repeat.set(14, 12); return m; })();
+
+  // ---- structure
+  const frame = group('Frame');
+  frame.add(box(W, 0.06, D, R.black, 0, base - 0.03, 0, 'Base'));
+  frame.add(box(W, 0.03, D, R.black, 0, H - 0.015, 0, 'Top'));
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    frame.add(box(0.045, H - base, 0.045, R.black, sx * (W / 2 - 0.0225), (H + base) / 2 - 0.015, sz * (D / 2 - 0.0225), 'Corner post'));
+    frame.add(cyl(0.035, 0.05, R.blackGloss, sx * (W / 2 - 0.07), 0.035, sz * (D / 2 - 0.09), 'x', 'Caster'));
+  }
+  frame.add(box(W - 0.05, 0.06, 0.34, R.black, 0, H + 0.03, -D / 2 + 0.19, 'Top exit enclosure'));
+  // 19-inch mounting rails
+  for (const sx of [-1, 1]) for (const z of [Z_FRONT, -0.40]) frame.add(box(0.02, 42 * U, 0.004, R.zinc, sx * 0.235, uY(1) + 21 * U, z, 'EIA rail'));
+  root.add(frame);
+
+  // ---- covers and doors
+  const doorH = H - 0.06;
+  const mkPerf = (rx, ry) => { const m = DP.perf.clone(); m.alphaMap = DP._perfTex.clone(); m.alphaMap.wrapS = m.alphaMap.wrapT = THREE.RepeatWrapping; m.alphaMap.repeat.set(rx, ry); DP['_perf' + rx] = m; return m; };
+  const { sideL, sideR, front } = buildCovers(DP);
+  root.add(sideL, sideR, front);
 
   const rear = new THREE.Group(); rear.name = 'Rear door';
   rear.position.set(W / 2, 0.05, -D / 2);
@@ -226,7 +253,7 @@ export function buildRack(R, DP, HP) {
   const rcu = buildRadiator(R);
   rcu.group.position.set(0, uY(1) + 0.002, Z_FRONT - 0.39);
   root.add(rcu.group);
-  refs.rcu = rcu.group;
+  refs.rcu = rcu.group; refs.rcuParts = rcu.refs;
 
   // hero CPC0 is added by the caller's palette; CPC1/CPC2 are shells
   refs.cpc = [];
@@ -278,6 +305,24 @@ export function buildRack(R, DP, HP) {
   pair(0, 1, 0); pair(1, 2, 1); pair(0, 2, 2);
   root.add(smp);
   refs.smpCables = smp;
+
+  // fanout cables: each I/O domain's switch card to a fanout slot of CPC0, and the payment's fiber
+  const ioc = group('PCIe+ fanout cables');
+  const ioY = uY(31) + 0.003, ioZ = Z_FRONT - 0.35 - 0.35;
+  refs.ioPath = [];
+  for (const sx of [-1, 1]) {
+    const sw = io.refs.card('sw', sx);
+    const a = [sw.position.x + sx * 0.04, ioY + sw.position.y, ioZ], f = refs.cpc[0].refs.fanouts[sx < 0 ? 2 : 9];
+    const b = [f.position.x, uY(10) + 0.003 + f.position.y + 0.02, zr];
+    const pts = [a, [a[0], a[1], ioZ - 0.07], [sx * 0.215, a[1] - 0.12, ioZ - 0.11], [sx * 0.215, b[1] + 0.25, zr - 0.10], [b[0], b[1] + 0.03, zr - 0.07], b];
+    ioc.add(hose(pts, 0.008, R.hose, `Fanout cable (domain ${sx < 0 ? 0 : 1})`));
+    refs.ioPath.push(pts);
+  }
+  const osa = io.refs.card('osa', 1);
+  refs.fiberPts = [[0.19, H + 0.5, -D / 2 - 0.25], [0.2, H - 0.15, -D / 2 - 0.12], [0.21, ioY + osa.position.y + 0.25, ioZ - 0.10], [osa.position.x + 0.03, ioY + osa.position.y + 0.03, ioZ - 0.06], [osa.position.x + 0.03, ioY + osa.position.y, ioZ]];
+  ioc.add(hose(refs.fiberPts, 0.004, R.aqua, 'Fiber (network)'));
+  root.add(ioc);
+  refs.ioCables = ioc;
 
   return { group: root, refs };
 }

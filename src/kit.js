@@ -38,6 +38,7 @@ export function hose(points, r, mat, name) {
   const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.35);
   const m = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(12, points.length * 8), r, 10), mat);
   m.castShadow = m.receiveShadow = true;
+  m.userData.curve = curve;
   if (name) m.name = name;
   return m;
 }
@@ -56,6 +57,62 @@ function finish(c, { repeat, srgb = true } = {}) {
   t.anisotropy = 8;
   if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(...repeat); }
   return t;
+}
+
+/** Soft radial glow for sprites. */
+export function glowTexture() {
+  const [c, g] = canvas(128, 128);
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,255,255,.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return finish(c);
+}
+
+/** Card-reader screen. */
+export function screenTexture(line1, line2, bg, fg) {
+  const [c, g] = canvas(512, 320);
+  g.fillStyle = bg; g.fillRect(0, 0, 512, 320);
+  g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.font = '700 74px "Helvetica Neue", Arial, sans-serif'; g.fillText(line1, 256, line2 ? 130 : 160);
+  if (line2) { g.font = '500 40px "Helvetica Neue", Arial, sans-serif'; g.fillText(line2, 256, 215); }
+  return finish(c);
+}
+
+// Rectangles [x, y, w, h] on the Telum floor plan, in 0..1 texture space (y down).
+export const DIE = {
+  core: (i) => [i % 2 ? 0.735 : 0.115, 0.185 + Math.floor(i / 2) * 0.18, 0.16, 0.17],
+  l2: (i) => [i % 2 ? 0.51 : 0.285, 0.185 + Math.floor(i / 2) * 0.18, 0.215, 0.17],
+  aiu: [0.115, 0.915, 0.215, 0.075],
+  xbus: [0.09, 0.012, 0.77, 0.06],
+  mbus: [0.345, 0.915, 0.33, 0.075],
+  abus: [0.925, 0.18, 0.065, 0.26],
+};
+
+// Units of one core, after Figure 2-15 of the Technical Guide, as [x, y, w, h] within the core.
+export const CORE_UNITS = {
+  LSU: [0, 0, 0.42, 0.42, 'LSU\nload / store\n+ L1 data'], FXU: [0.44, 0, 0.2, 0.3, 'FXU\nfixed\npoint'], VFU: [0.66, 0, 0.34, 0.3, 'VFU\nvector, float\n+ decimal'],
+  XU: [0, 0.44, 0.42, 0.14, 'XU  address translation'], ISU: [0.44, 0.32, 0.4, 0.26, 'ISU\nout-of-order\nsequencing'], MA: [0.86, 0.32, 0.14, 0.26, 'MA'],
+  ICM: [0, 0.6, 0.42, 0.14, 'ICM  L1 instruction'], IDU: [0.44, 0.6, 0.36, 0.16, 'IDU  decode'], RU: [0.82, 0.6, 0.18, 0.16, 'RU\nrecovery'],
+  COP: [0, 0.76, 0.18, 0.24, 'CoP\ncrypto +\ncompress'], IFB: [0.2, 0.78, 0.8, 0.22, 'IFB  instruction fetch + branch prediction'],
+};
+
+/** Floor plan of a single core (diagram). */
+export function coreDetailTexture() {
+  const S = 1024;
+  const [c, g] = canvas(S, S);
+  g.fillStyle = '#0d1016'; g.fillRect(0, 0, S, S);
+  const hue = { LSU: 200, FXU: 28, VFU: 280, XU: 160, ISU: 45, MA: 320, ICM: 200, IDU: 100, RU: 0, COP: 330, IFB: 215 };
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (const [k, [x, y, w, h, label]] of Object.entries(CORE_UNITS)) {
+    const X = x * S + 6, Y = y * S + 6, W = w * S - 12, H = h * S - 12;
+    g.fillStyle = `hsl(${hue[k]} 45% 20%)`; g.fillRect(X, Y, W, H);
+    for (let i = 0; i < W * H / 2600; i++) { const bw = (0.05 + rnd() * 0.25) * W, bh = (0.05 + rnd() * 0.2) * H; g.fillStyle = `hsl(${hue[k] + rnd() * 24 - 12} 50% ${22 + rnd() * 22}%)`; g.fillRect(X + rnd() * (W - bw), Y + rnd() * (H - bh), bw, bh); }
+    g.strokeStyle = 'rgba(255,214,90,.9)'; g.lineWidth = 5; g.strokeRect(X, Y, W, H);
+    const lines = label.split('\n'); const size = Math.min(H / (lines.length + 0.8), W / (Math.max(...lines.map((l) => l.length)) * 0.56), 64);
+    g.font = `700 ${size}px Arial`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    lines.forEach((l, i) => { const ty = Y + H / 2 + (i - (lines.length - 1) / 2) * size * 1.1; g.fillStyle = 'rgba(0,0,0,.8)'; g.fillText(l, X + W / 2 + 3, ty + 3); g.fillStyle = i ? '#ffeeb0' : '#ffe27a'; g.fillText(l, X + W / 2, ty); });
+  }
+  return finish(c);
 }
 
 /** Hex-perforated sheet metal alpha mask (white = metal, black = hole). */
@@ -252,6 +309,7 @@ export function makePalette() {
     facetDark: std({ color: 0x17181b, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide }),
     facetLight: std({ color: 0x74777c, metalness: 0.55, roughness: 0.5, side: THREE.DoubleSide }),
     facetBlue: std({ color: 0x0a3fd0, emissive: 0x0b45e0, emissiveIntensity: 0.55, roughness: 0.4, side: THREE.DoubleSide }),
+    aqua: std({ color: 0x19c2c9, metalness: 0.0, roughness: 0.6 }),
     silicon: std({ color: 0x3d4350, metalness: 0.9, roughness: 0.22 }),
     _perfTex: perf,
   };
