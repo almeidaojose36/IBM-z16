@@ -31,6 +31,8 @@ lets you orbit at any moment. **Export .glb** saves the model as it stands at th
 
 ## Make the video
 
+**Rendering on your own machine? Follow [docs/RENDERING.md](docs/RENDERING.md).** The outline below is the short version.
+
 Needs `ffmpeg`, Python 3 with numpy, and Playwright's Chromium:
 
 ```bash
@@ -64,16 +66,18 @@ after changing the script, voice, music or effects.
    node tools/cues.mjs && python3 tools/mix_audio.py
    ```
 
-4. **Picture**. Renders in two-minute chunks to `out/chunks/` and can be stopped and re-run:
+4. **Picture**. Renders in one-minute chunks to `out/chunks/` and can be stopped and re-run:
 
    ```bash
-   tools/render-all.sh 120 24 0.8
+   tools/render-all.sh
    ```
 
-   The arguments are chunk length in seconds, frames per second, and 3D scale. At scale 0.8 the 3D is
-   drawn at 1536×864 and upscaled to 1080p while text stays sharp, which keeps software rendering near
-   0.55 s per frame (about 4.5 hours for the whole video). On a machine with a GPU, edit the script to
-   pass `--gpu` to `render-video.mjs` and use scale 1.
+   ```bash
+   WIDTH=3840 HEIGHT=2160 tools/render-all.sh
+   ```
+
+   The first is 1080p at 30 fps on the GPU, the second 4K. See [docs/RENDERING.md](docs/RENDERING.md)
+   for the full step-by-step (GPU check, quality options, CPU-only fallback, troubleshooting).
 
 5. **Join**:
 

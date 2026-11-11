@@ -2,6 +2,11 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { makePalette } from './kit.js';
 import { buildRack, buildShell } from './model/rack.js';
 import { buildReader, buildFinfet, buildPacket } from './model/extras.js';
@@ -11,32 +16,40 @@ import { pulse } from './timeline.js';
 const params = new URLSearchParams(location.search);
 const RENDER = params.has('render');
 document.body.classList.toggle('render', RENDER);
+// ?quality=high (default): ambient occlusion, 4× MSAA, studio floor (add &bloom=0.2 for an optional glow pass). ?quality=draft: plain forward render (for CPU-only machines).
+const HIGH = (params.get('quality') ?? 'high') !== 'draft';
 
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('view');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: RENDER });
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 1.2;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0a0d12);
-scene.fog = new THREE.Fog(0x0a0d12, 9, 22);
+// (the post-processing chain tone-maps the backdrop too, so it starts a little brighter there)
+scene.background = new THREE.Color(HIGH ? 0x171c25 : 0x0a0d12);
+scene.fog = new THREE.Fog(scene.background, HIGH ? 6 : 9, HIGH ? 19 : 22);
 scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.03).texture;
-scene.environmentIntensity = 0.75;
+scene.environmentIntensity = 0.85;
 
-const key = new THREE.DirectionalLight(0xfff4e6, 2.6);
+const key = new THREE.DirectionalLight(0xfff4e6, 2.9);
 key.position.set(3.5, 6, 5);
 key.castShadow = true;
-key.shadow.mapSize.set(4096, 4096);
+key.shadow.mapSize.set(HIGH ? 8192 : 4096, HIGH ? 8192 : 4096); key.shadow.radius = 3;
 Object.assign(key.shadow.camera, { left: -3, right: 3, top: 3.5, bottom: -1.5, near: 1, far: 16 });
 key.shadow.bias = -0.0002; key.shadow.normalBias = 0.004;
 const rim = new THREE.DirectionalLight(0x7aa7ff, 1.3);
 rim.position.set(-4, 3, -5);
-scene.add(key, rim, new THREE.HemisphereLight(0xcfd8e6, 0x10131a, 0.35));
+// soft fill from behind-right so rear views of the frame are not left in the dark
+const fill = new THREE.DirectionalLight(0xdfe8ff, 0.55);
+fill.position.set(3, 4, -6);
+scene.add(key, rim, fill, new THREE.HemisphereLight(0xcfd8e6, 0x10131a, 0.4));
 
-const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshLambertMaterial({ color: 0x323a47 })); // matte: far cheaper than PBR over this many pixels
+const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), HIGH
+  ? new THREE.MeshStandardMaterial({ color: 0x1d232e, metalness: 0.0, roughness: 0.8, envMapIntensity: 0.22 })   // soft studio sheen
+  : new THREE.MeshLambertMaterial({ color: 0x323a47 }));                                   // matte: far cheaper in software
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 floor.name = 'Studio floor';
@@ -52,7 +65,7 @@ scene.add(rack.group);
 // extra frames of a four-frame system, the card reader, the transistor patch and the payment light
 palettes.ext = makePalette();
 const shells = ['Z frame', 'B frame', 'C frame'].map((n) => { const s = buildShell(palettes.ext, n); s.visible = false; scene.add(s); return s; });
-const reader = buildReader(makePalette());
+const reader = buildReader();
 reader.group.position.set(60, 0.9, 0);
 const finfet = buildFinfet();
 finfet.group.position.set(-60, 0, 0);
@@ -61,6 +74,20 @@ scene.add(reader.group, finfet.group, packet);
 
 const story = buildStory({ rack, palettes, reader, finfet, packet, shells, scene });
 const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.01, 80);
+// ---- post-processing (high quality only)
+let composer = null, gtao = null, bloom = null;
+if (HIGH) {
+  const target = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, samples: 4 });
+  composer = new EffectComposer(renderer, target);
+  composer.addPass(new RenderPass(scene, camera));
+  gtao = new GTAOPass(scene, camera, 4, 4);
+  gtao.blendIntensity = 0.85;
+  composer.addPass(gtao);
+  if (params.get('ao') === '0') gtao.enabled = false;
+  bloom = new UnrealBloomPass(new THREE.Vector2(4, 4), Number(params.get('bloom') ?? 0), 0.6, 0.92);
+  if (bloom.strength > 0) composer.addPass(bloom);
+  composer.addPass(new OutputPass());
+}
 const controls = new OrbitControls(camera, canvas);
 controls.enabled = false;
 
@@ -141,7 +168,9 @@ function updateOverlay(t) {
     if (!show) continue;
     const p = c.at().project(camera);
     const ax = (p.x * 0.5 + 0.5) * W, ay = (-p.y * 0.5 + 0.5) * H;
-    const lx = ax + c.off[0] * u, ly = ay + c.off[1] * u;
+    // keep the label inside the title-safe area
+    const hw = c.el.offsetWidth / 2, hh = c.el.offsetHeight / 2, safe = 4 * u;
+    const lx = Math.min(W - safe - hw, Math.max(safe + hw, ax + c.off[0] * u)), ly = Math.min(H - safe - hh, Math.max(safe + hh + 5 * u * (ax + c.off[0] * u < 40 * u ? 1 : 0), ay + c.off[1] * u));
     c.el.style.left = lx + 'px'; c.el.style.top = ly + 'px'; c.el.style.opacity = k;
     // leader runs from the anchor to the near edge of the label
     const ex = lx - Math.sign(c.off[0]) * Math.min(Math.abs(c.off[0]) * u, c.el.offsetWidth / 2);
@@ -162,12 +191,14 @@ function setTime(t) {
     camera.lookAt(c.look);
     // keep depth precision from the whole frame down to a 23 mm die
     const d = c.pos.distanceTo(c.look);
-    camera.near = Math.max(0.0004, d * 0.04); camera.far = 80;
+    camera.near = Math.max(0.0004, d * 0.04); camera.far = 45;
     camera.updateProjectionMatrix();
+    // occlusion radius follows the scale of the shot (a 2 m frame … a 23 mm chip)
+    if (gtao) gtao.updateGtaoMaterial({ radius: Math.min(0.25, Math.max(0.004, d * 0.05)), distanceExponent: 1, thickness: 1, scale: 1, samples: 16, screenSpaceRadius: false });
   }
   camera.updateMatrixWorld();
   scene.updateMatrixWorld();
-  renderer.render(scene, camera);
+  if (composer) composer.render(); else renderer.render(scene, camera);
   updateOverlay(time);
 }
 
@@ -176,6 +207,7 @@ function resize() {
   // ?scale=0.8 renders the 3D at 80% and lets the browser upscale it; text stays sharp
   renderer.setPixelRatio(RENDER ? Number(params.get('scale') ?? 1) : Math.min(devicePixelRatio, 2));
   renderer.setSize(w, h, false);
+  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
   camera.aspect = w / h; camera.updateProjectionMatrix();
   lines.setAttribute('viewBox', `0 0 ${w} ${h}`);
   setTime(time);
@@ -211,9 +243,10 @@ window.__beauty = (pos, look) => {
   $('overlay').style.display = $('lines').style.display = $('shade').style.display = 'none';
   camera.fov = 24; camera.position.set(...pos); camera.lookAt(...look);
   camera.near = 0.1; camera.updateProjectionMatrix();
-  renderer.render(scene, camera);
+  if (composer) composer.render(); else renderer.render(scene, camera);
   return true;
 };
+{ const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'); window.__gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); }
 window.__ready = true;
 
 // ---- interactive playback

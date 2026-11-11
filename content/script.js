@@ -103,7 +103,7 @@ export const CHAPTERS = [
   ] },
 
   { id: 'telum', title: 'Telum', beats: [
-    { id: 't1', text: 'One Telum chip is five hundred and thirty square millimeters of silicon, carrying twenty-two and a half billion transistors.', hold: 1.0 },
+    { id: 't1', text: 'A single Telum chip is five hundred and thirty square millimeters of silicon, carrying twenty-two and a half billion transistors.', hold: 1.0 },
     { id: 't2', text: 'Most of what you see is laid out in a grid. Eight cores. These are the parts that actually run programs.' },
     { id: 't3', text: 'Each core runs at five point two gigahertz. That is more than five billion steps every second. That is among the fastest clocks of any processor, and this one holds it all day, every day, for years.' },
     { id: 't3b', text: 'In the time one of those steps takes, a beam of light travels less than six centimeters.' },

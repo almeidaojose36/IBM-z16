@@ -6,7 +6,7 @@ import { openStage, parseArgs } from './browser.mjs';
 import { CHAPTERS } from '../content/script.js';
 import { TIMING } from '../content/timing.js';
 
-const o = parseArgs({ width: 960, height: 540, at: 0.6, only: '', dir: 'out/review', gpu: false, scale: 1 });
+const o = parseArgs({ width: 960, height: 540, at: 0.6, only: '', dir: 'out/review', gpu: false, headed: false, scale: 1, quality: 'high' });
 fs.rmSync(o.dir, { recursive: true, force: true }); fs.mkdirSync(o.dir, { recursive: true });
 const { page, close } = await openStage(o);
 let n = 0;

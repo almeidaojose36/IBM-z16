@@ -56,8 +56,13 @@ function fan(P, i) {
 function dimm(P) {
   const g = group('DIMM');
   g.add(box(0.0014, DIMM_H, DIMM_L, P.pcb, 0, DIMM_H / 2, 0));
-  g.add(box(0.0042, 0.012, DIMM_L - 0.012, P.chip, 0, DIMM_H * 0.62, 0));
+  // nine memory packages a side, a register chip, heat spreader clip and the label
+  for (let k = 0; k < 9; k++) g.add(box(0.0040, 0.011, 0.0105, P.chip, 0, DIMM_H * 0.66, (k - 4) * 0.0132));
+  g.add(box(0.0036, 0.006, 0.014, P.chip, 0, DIMM_H * 0.3, 0));
+  g.add(box(0.0046, 0.0025, DIMM_L - 0.02, P.alu, 0, DIMM_H - 0.0005, 0, 'Heat spreader clip'));
+  g.add(box(0.0041, 0.006, 0.03, P.white, 0, DIMM_H * 0.3, 0.035, 'Label'));
   g.add(box(0.0018, 0.003, DIMM_L - 0.008, P.gold, 0, 0.0015, 0));
+  for (const s of [-1, 1]) g.add(box(0.005, 0.014, 0.004, P.white, 0, 0.004, s * (DIMM_L / 2 + 0.001), 'Latch'));
   return g;
 }
 
@@ -65,7 +70,7 @@ function dimm(P) {
 function dcm(P, i) {
   const g = group(`PU DCM ${i}`);
   const sw = 0.0715, sd = 0.079;
-  g.add(box(sw, 0.0032, sd, P.pcbDark, 0, 0.0016, 0, 'Substrate'));
+  g.add(box(sw, 0.0032, sd, P.substrate, 0, 0.0016, 0, 'Substrate'));
   g.add(box(sw - 0.004, 0.0006, sd - 0.004, P.gold, 0, -0.0003, 0, 'LGA pads'));
   const dies = group('Telum dies');
   dieTex ??= telumDieTexture();
@@ -113,7 +118,16 @@ export function buildCpcDrawer(P, { detail = true, name = 'CPC drawer' } = {}) {
   chassis.add(box(W, t, D, P.steel, 0, t / 2, 0, 'Floor'));
   chassis.add(box(t, H, D, P.steel, -W / 2 + t / 2, H / 2, 0, 'Left wall'), box(t, H, D, P.steel, W / 2 - t / 2, H / 2, 0, 'Right wall'));
   chassis.add(box(W, t, 0.012, P.steel, 0, H - 0.05, Z_FAN, 'Fan bay rail'));
-  for (const s of [-1, 1]) chassis.add(box(0.016, H, 0.004, P.steelDark, s * (W / 2 + 0.008), H / 2, ZF - 0.002, 'Rack ear'));
+  for (const s of [-1, 1]) {
+    chassis.add(box(0.016, H, 0.004, P.steelDark, s * (W / 2 + 0.008), H / 2, ZF - 0.002, 'Rack ear'));
+    chassis.add(box(0.012, t, D - 0.004, P.steel, s * (W / 2 - 0.007), H - t * 1.5, 0, 'Wall flange'));            // folded top lip
+    chassis.add(box(0.003, 0.03, D - 0.12, P.steelDark, s * (W / 2 + 0.0015), H * 0.45, -0.02, 'Slide rail'));
+    for (let k = 0; k < 9; k++) {                                                                                   // cover screws and wall rivets
+      chassis.add(cyl(0.0028, 0.0016, P.zinc, s * (W / 2 - 0.007), H - t * 0.9, ZF - 0.06 - k * 0.085, 'y', 'Cover screw'));
+      chassis.add(cyl(0.0022, 0.0012, P.zinc, s * (W / 2 + 0.0002), 0.03 + (k % 2) * 0.13, ZF - 0.09 - k * 0.08, 'x', 'Rivet'));
+    }
+    for (let k = 0; k < 2; k++) chassis.add(cyl(0.004, 0.003, P.zinc, s * (W / 2 + 0.008), 0.04 + k * 0.135, ZF + 0.0005, 'z', 'Thumbscrew'));
+  }
   root.add(chassis);
 
   // ---- covers (front cover spans fans→DCMs, rear cover the I/O cage)
@@ -152,11 +166,10 @@ export function buildCpcDrawer(P, { detail = true, name = 'CPC drawer' } = {}) {
   const slotX = (i) => (i < 6 ? -0.205 + i * 0.031 : 0.05 + (i - 6) * 0.031);
   for (let i = 0; i < 12; i++) {
     const f = group(`PCIe+ fanout LG${String(i + 1).padStart(2, '0')}`);
-    const face = box(0.024, 0.112, 0.003, P.fanoutFace, 0, 0, 0);
-    face.material = P.fanoutFace;
-    f.add(face);
     // face texture is landscape; turn the bracket so the two ports stack vertically
-    face.rotation.z = Math.PI / 2; face.scale.set(0.112, 0.024, 0.003);
+    const face = box(0.112, 0.024, 0.003, P.fanoutFace, 0, 0, 0);
+    face.rotation.z = Math.PI / 2;
+    f.add(face);
     f.add(box(0.008, 0.016, 0.006, P.blue, 0, 0.064, -0.002));
     if (detail) {
       f.add(box(0.0016, 0.10, 0.19, P.pcb, 0, 0, 0.097));
@@ -179,6 +192,7 @@ export function buildCpcDrawer(P, { detail = true, name = 'CPC drawer' } = {}) {
     const fanFace = new THREE.Mesh(new THREE.CircleGeometry(0.017, 20), P.black);
     fanFace.position.set(-0.028, 0, -0.0006); fanFace.rotation.y = Math.PI;
     p.add(fanFace, box(0.03, 0.022, 0.004, P.black, 0.022, 0, -0.002, 'C20 inlet'), box(0.006, 0.03, 0.01, P.orange, 0.046, 0, -0.004));
+    p.add(box(0.03, 0.004, 0.012, P.black, -0.028, -0.014, -0.006, 'Handle'), cyl(0.0016, 0.002, P.led, 0.04, 0.013, -0.001, 'z', 'Status LED'));
     p.position.set((i - 1.5) * 0.108, 0.026, ZR);
     cage.add(p); refs.psus.push(p);
   }
@@ -226,6 +240,12 @@ export function buildCpcDrawer(P, { detail = true, name = 'CPC drawer' } = {}) {
       root.add(pol); refs.pols.push(pol);
     }
   });
+  // bulk capacitors and inductors feeding the processor sockets
+  for (let i = 0; i < 4; i++) {
+    const x = (i - 1.5) * 0.098, z = Z_DCM + 0.062;
+    for (let k = 0; k < 7; k++) root.add(cyl(0.0042, 0.011, P.alu, x - 0.033 + k * 0.011, BY + 0.0055, z, 'y', 'Capacitor'));
+    for (let k = 0; k < 4; k++) root.add(box(0.011, 0.008, 0.011, P.chip, x - 0.027 + k * 0.018, BY + 0.004, Z_DCM - 0.058, 'Inductor'));
+  }
   // VRMs outboard of the DCM row
   for (const s of [-1, 1]) for (let k = 0; k < 2; k++) {
     const v = group('VRM',
@@ -254,7 +274,11 @@ export function buildCpcDrawer(P, { detail = true, name = 'CPC drawer' } = {}) {
       box(0.090, 0.005, 0.010, P.steelDark, 0, 0.0205, -0.039, 'Load frame'),
       box(0.090, 0.005, 0.010, P.steelDark, 0, 0.0205, 0.039, 'Load frame'),
       box(0.012, 0.012, 0.012, P.alu, -0.018, 0.024, -0.02, 'Inlet'), box(0.012, 0.012, 0.012, P.alu, 0.018, 0.024, -0.02, 'Outlet'));
-    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) cp.add(cyl(0.004, 0.012, P.steel, sx * 0.037, 0.022, sz * 0.039));
+    for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      cp.add(cyl(0.004, 0.012, P.steel, sx * 0.037, 0.022, sz * 0.039), cyl(0.0055, 0.0022, P.zinc, sx * 0.037, 0.029, sz * 0.039, 'y', 'Spring screw'));
+    }
+    cp.add(box(0.05, 0.0012, 0.03, P.copperDark, 0, 0.0186, 0.012, 'Machined channel cover'));
+    for (const sx of [-1, 1]) cp.add(cyl(0.0046, 0.012, P.alu, sx * 0.018, 0.031, -0.02, 'y', 'Barb fitting'));
     cp.position.set(x, BY + 0.0146, Z_DCM);
     cooling.add(cp);
     // supply / return hoses from the manifold

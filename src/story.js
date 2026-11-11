@@ -103,11 +103,11 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   const tapA = S('h1') + 0.7, tapZ = S('z3') - 6;
   tl.hook((t) => {
     const k = Math.max(pulse(t, tapA, 1.3, tapA + 4.5, 1.2), 0);
-    reader.card.position.copy(cardRest).lerp(new THREE.Vector3(0.0, 0.085, 0.03), k);
-    reader.card.rotation.set(cardRot.x * (1 - k) + 0.32 * k, cardRot.y * (1 - k), cardRot.z * (1 - k));
+    reader.card.position.copy(cardRest).lerp(reader.tap.pos, k);
+    reader.card.rotation.set(cardRot.x * (1 - k) + reader.tap.rotX * k, cardRot.y * (1 - k), cardRot.z * (1 - k));
     const approvedA = E('h1') - 0.75, approvedZ = E('z3') + 0.9;
     const phase = t < dips[0] + 0 && t < S('h3') ? (t < tapA + 1.3 ? 0 : t < approvedA ? 1 : 2) : (t < approvedZ ? 1 : 2);
-    reader.screens.idle.visible = phase === 0; reader.screens.wait.visible = phase === 1; reader.screens.ok.visible = phase === 2;
+    reader.setLeds(phase === 0 ? (k > 0.5 ? 1 + Math.min(3, Math.floor((k - 0.5) * 8)) : 1) : 4); reader.screens.idle.visible = phase === 0; reader.screens.wait.visible = phase === 1; reader.screens.ok.visible = phase === 2;
   });
   cue(tapA + 1.3, 'beep', 0.8); cue(E('h1') - 0.75, 'approved'); cue(E('z3') + 0.9, 'approved', 1.2);
 
@@ -283,7 +283,7 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   const along = (pts, t0, t1, s, rev = false) => { const c = new THREE.CatmullRomCurve3(pts.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.35); for (let i = 0; i <= 14; i++) { const u = i / 14; P(t0 + (t1 - t0) * u, c.getPointAt(rev ? 1 - u : u).toArray(), s); } };
   const vis = [];       // visible windows
   // hook: leaves the reader
-  P(tapA + 1.3, [RX.x, RX.y + 0.06, RX.z + 0.03], 0.004); P(S('h2') + 0.5, [RX.x, RX.y + 0.16, RX.z], 0.006); P(E('h2') - 2.5, [RX.x + 0.1, RX.y + 0.22, RX.z - 0.1], 0.006); P(E('h2') + 0.6, [RX.x + 0.6, RX.y + 0.9, RX.z - 6], 0.01);
+  P(tapA + 1.3, [RX.x + reader.tap.screen.x, RX.y + reader.tap.screen.y, RX.z + reader.tap.screen.z], 0.004); P(S('h2') + 0.5, [RX.x, RX.y + 0.22, RX.z - 0.02], 0.006); P(E('h2') - 2.5, [RX.x + 0.1, RX.y + 0.22, RX.z - 0.1], 0.006); P(E('h2') + 0.6, [RX.x + 0.6, RX.y + 0.9, RX.z - 6], 0.01);
   vis.push([tapA + 1.3, E('h2') + 0.6]);
   // arrives by fibre, sits on the network card
   const osaP = cardW(osa, -0.02), cryP = cardW(crypto, -0.02), swP = cardW(swR, -0.02), fcP = cardW(fc, -0.02);
@@ -334,9 +334,9 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   const cam = new ShotCamera();
   const rd = (p) => [RX.x + p[0], RX.y + p[1], RX.z + p[2]], ff = (p) => [FX.x + p[0], FX.y + p[1], FX.z + p[2]];
   // hook
-  cam.cut(0, rd([0.34, 0.26, 0.5]), rd([0.02, 0.04, 0]));
-  cam.to(S('h1') + 0.5, 5, rd([0.22, 0.2, 0.36]), rd([0, 0.04, 0]));
-  cam.to(S('h2'), E('h2') - S('h2'), rd([0.3, 0.3, 0.55]), rd([0.04, 0.2, -0.2]));
+  cam.cut(0, rd([0.2, 0.25, 0.36]), rd([0.01, 0.085, 0]));
+  cam.to(S('h1') + 0.5, 5, rd([0.12, 0.2, 0.25]), rd([0, 0.09, 0]));
+  cam.to(S('h2'), E('h2') - S('h2'), rd([0.2, 0.27, 0.4]), rd([0.07, 0.13, -0.04]));
   const dZ = dip(S('h3') - 0.45);
   cam.cut(dZ, [-2.4, 1.2, 4.2], [0, 1.05, 0]);
   cam.to(dZ + 0.1, N('h3b') - dZ, [2.0, 1.4, 4.4], [0, 1.0, 0]);
@@ -449,8 +449,8 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   cam.to(CH('close') + 0.8, 3.6, [1.3, 1.35, -3.1], [0.25, 1.1, -0.4]);
   cam.to(S('z2') - 0.2, 2.6, [1.0, 1.9, -2.6], [0.2, 1.65, -0.35]);
   const dR = dip(S('z3') - 0.45);
-  cam.cut(dR, rd([0.24, 0.2, 0.38]), rd([0, 0.04, 0]));
-  cam.to(dR + 0.1, N('z3') - dR, rd([0.14, 0.17, 0.26]), rd([0, 0.045, -0.01]));
+  cam.cut(dR, rd([0.17, 0.22, 0.31]), rd([0, 0.085, 0]));
+  cam.to(dR + 0.1, N('z3') - dR, rd([0.1, 0.18, 0.22]), rd([0, 0.09, 0]));
   cam.cut(dClose, [-2.8, 1.3, 5.6], [0.3, 1.0, 0]);
   cam.to(dClose + 0.1, N('z4') - dClose, [1.0, 1.4, 6.6], [0.3, 1.0, 0]);
   cam.to(S('z5'), N('z5') - S('z5') + 6, [3.6, 1.6, 5.8], [0.3, 1.0, 0]);
@@ -494,8 +494,8 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   call(S('c4') + 6.0, N('c4') - 3, () => crypto.localToWorld(v.set(-0.02, 0.012, 0.1)).clone(), [-32, -10], 'Quantum-safe algorithms', 'Protection against "harvest now, decrypt later"');
   // drawer
   call(S('d4') + 0.4, N('d4'), of(h.fans[3], 0.02, 0.05, 0.05), [26, -14], '5 fans', 'Any four are enough');
-  call(S('d5') + 0.5, N('d5'), of(h.dimmGroups[2], 0.03, 0.035, 0), [30, -12], '48 memory slots', 'DDR4 modules in six groups of eight');
-  call(S('d6') + 0.8, N('d6'), of(h.cooling, 0.147, 0.05, -0.075), [30, -14], '4 processor modules', 'Under water-cooled cold plates');
+  call(S('d5') + 0.5, N('d5'), of(h.dimmGroups[4], 0, 0.04, 0), [30, 14], '48 memory slots', 'DDR4 modules in six groups of eight');
+  call(S('d6') + 0.8, N('d6'), of(h.cooling, 0.049, 0.045, -0.075), [30, 16], '4 processor modules', 'Under water-cooled cold plates');
   call(S('d7') + 0.8, N('d7'), of(h.fanouts[8], 0, 0.06, 0), [-30, -14], '12 fanout slots', 'PCIe+ links to the I/O drawers');
   call(S('d7b') + 1.0, N('d7b'), of(h.frontCards[2], 0, 0, 0.01), [26, 10], '2 × control card', 'BMC and oscillator');
   call(S('d9') + 2.4, N('d9'), of(h.psus[0], 0, 0, -0.02), [-6, -20], '4 power supplies', 'The drawer runs on three');
@@ -506,7 +506,7 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   call(S('pw1') + 6.0, N('pw2'), of(R.pdus[0], 0, 0.3, -0.03), [30, -12], 'Power distribution unit', 'Three-phase, switched per outlet');
   call(S('pw2') + 2.0, N('pw2'), of(R.pdus[1], 0, 0.5, -0.03), [-28, 4], 'Second feed', 'Either one carries the frame');
   call(S('pw3') + 1.2, S('pw3') + 6.2, of(h.psus[1], 0, 0.02, -0.01), [24, -18], 'AC in, 12 V out', '4 supplies, N + 1');
-  call(S('pw3') + 10, N('pw4') - 1.8, of(h.pols[0], 0, 0.11, 0), [28, -14], 'Point-of-load regulators', '12 V down to processor voltage, N + 2');
+  call(S('pw3') + 10, N('pw4') - 1.8, of(h.pols[3], 0, 0.036, 0), [-30, -16], 'Point-of-load regulators', '12 V down to processor voltage, N + 2');
   // memory
   call(S('m2') + 1.4, N('m2'), of(h.dimmGroups[5], 0, 0.14, 0), [-26, -14], 'Up to 10 TB per drawer', '40 TB across four drawers');
   call(S('m4') + 1.5, N('m5'), of(raim, 0.04, 0.14, 0.03), [30, -14], 'Group of 8 modules', 'Data + error correction spread across all');

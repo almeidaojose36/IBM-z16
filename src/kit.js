@@ -1,13 +1,28 @@
 // Small modelling kit: shared geometry, PBR palettes, canvas textures.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 
 const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
-const UNIT_CYL = new THREE.CylinderGeometry(1, 1, 1, 28);
+const UNIT_CYL = new THREE.CylinderGeometry(1, 1, 1, 48);
 
-/** Box of w×h×d metres centred at (x,y,z). Shares one geometry across the scene. */
+// Boxes get a small bevel so edges catch the light (real parts are never razor sharp).
+// Geometries are cached by size; very thin sheets stay as plain scaled boxes.
+const BEVEL = new URLSearchParams(globalThis.location?.search ?? '').get('bevel') !== '0';
+const boxCache = new Map();
+function boxGeometry(w, h, d) {
+  const min = Math.min(w, h, d);
+  if (!BEVEL || min < 0.0011) return null;
+  const key = `${w.toFixed(4)}|${h.toFixed(4)}|${d.toFixed(4)}`;
+  let g = boxCache.get(key);
+  if (!g) boxCache.set(key, g = new RoundedBoxGeometry(w, h, d, 2, Math.min(min * 0.14, 0.0022 + Math.max(w, h, d) * 0.002)));
+  return g;
+}
+
+/** Box of w×h×d metres centred at (x,y,z), with lightly bevelled edges. */
 export function box(w, h, d, mat, x = 0, y = 0, z = 0, name) {
-  const m = new THREE.Mesh(UNIT_BOX, mat);
-  m.scale.set(w, h, d);
+  const geo = boxGeometry(w, h, d);
+  const m = new THREE.Mesh(geo ?? UNIT_BOX, mat);
+  if (!geo) m.scale.set(w, h, d);
   m.position.set(x, y, z);
   m.castShadow = m.receiveShadow = true;
   if (name) m.name = name;
@@ -36,7 +51,7 @@ export function group(name, ...children) {
 /** Smooth hose through the given points. */
 export function hose(points, r, mat, name) {
   const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)), false, 'catmullrom', 0.35);
-  const m = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(12, points.length * 8), r, 10), mat);
+  const m = new THREE.Mesh(new THREE.TubeGeometry(curve, Math.max(24, points.length * 16), r, 16), mat);
   m.castShadow = m.receiveShadow = true;
   m.userData.curve = curve;
   if (name) m.name = name;
@@ -269,31 +284,90 @@ export function telumDieTexture() {
   return finish(c);
 }
 
+/** Brushed-metal roughness / bump map: fine streaks along one axis. */
+export function brushedTexture(repeat = [1, 1]) {
+  const [c, g] = canvas(512, 512);
+  g.fillStyle = '#b8b8b8'; g.fillRect(0, 0, 512, 512);
+  let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 2600; i++) {
+    const v = 150 + rnd() * 105 | 0;
+    g.fillStyle = `rgba(${v},${v},${v},${0.10 + rnd() * 0.25})`;
+    g.fillRect(rnd() * 512 - 120, rnd() * 512, 60 + rnd() * 380, 1 + (rnd() * 2 | 0));
+  }
+  return finish(c, { repeat, srgb: false });
+}
+
+/** Fine grain for moulded plastic and powder coat (bump / roughness). */
+export function grainTexture(repeat = [4, 4]) {
+  const [c, g] = canvas(256, 256);
+  const im = g.createImageData(256, 256);
+  let seed = 5; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < im.data.length; i += 4) { const v = 150 + rnd() * 90 | 0; im.data[i] = im.data[i + 1] = im.data[i + 2] = v; im.data[i + 3] = 255; }
+  g.putImageData(im, 0, 0);
+  return finish(c, { repeat, srgb: false });
+}
+
+/** Circuit board: solder mask with traces, vias, pads and silkscreen. */
+export function pcbTexture(base = '#0f5a34', trace = '#17804a') {
+  const S = 1024;
+  const [c, g] = canvas(S, S);
+  g.fillStyle = base; g.fillRect(0, 0, S, S);
+  let seed = 17; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  g.strokeStyle = trace; g.lineCap = 'round'; g.lineJoin = 'round';
+  for (let i = 0; i < 150; i++) {                       // routed bundles with 45° jogs
+    let x = rnd() * S, y = rnd() * S; const n = 2 + (rnd() * 5 | 0), horiz = rnd() < 0.5;
+    g.lineWidth = 2 + (rnd() * 2 | 0);
+    for (let k = 0; k < n; k++) {
+      g.beginPath(); let px = x + (horiz ? 0 : k * 7), py = y + (horiz ? k * 7 : 0); g.moveTo(px, py);
+      let s2 = seed; const r2 = () => (s2 = (s2 * 16807) % 2147483647) / 2147483647;
+      for (let j = 0; j < 4; j++) { const len = 40 + r2() * 160, jog = (r2() - 0.5) * 60; if (horiz) { px += len; g.lineTo(px, py); px += Math.abs(jog); py += jog; } else { py += len; g.lineTo(px, py); py += Math.abs(jog); px += jog; } g.lineTo(px, py); }
+      g.stroke();
+    }
+    for (let j = 0; j < 9; j++) rnd();
+  }
+  for (let i = 0; i < 420; i++) {                       // vias
+    const x = rnd() * S, y = rnd() * S; g.fillStyle = '#c9b46a'; g.beginPath(); g.arc(x, y, 3.2, 0, 7); g.fill(); g.fillStyle = '#0a2a18'; g.beginPath(); g.arc(x, y, 1.3, 0, 7); g.fill();
+  }
+  for (let i = 0; i < 70; i++) {                        // small parts: pads, bodies, silkscreen outlines
+    const x = rnd() * S, y = rnd() * S, w = 10 + rnd() * 26, h = 6 + rnd() * 14;
+    g.fillStyle = '#d6dadf'; g.fillRect(x - 3, y, 3, h); g.fillRect(x + w, y, 3, h);
+    g.fillStyle = rnd() < 0.5 ? '#16181b' : '#6b4a2a'; g.fillRect(x, y, w, h);
+    g.strokeStyle = 'rgba(235,240,235,.55)'; g.lineWidth = 1; g.strokeRect(x - 6, y - 3, w + 12, h + 6);
+  }
+  return finish(c);
+}
+
 // ---------------------------------------------------------------- materials
 
 /**
  * A palette of PBR materials. Build one palette per independently fadeable assembly
  * (rack, doors, hero drawer) so `fadePalette` can ghost one without touching the others.
  */
+const SHARED = {};
 export function makePalette() {
   const std = (o) => new THREE.MeshStandardMaterial(o);
   const perf = perforationTexture([1, 1]);
+  SHARED.brushed ??= brushedTexture(); SHARED.grain ??= grainTexture(); SHARED.pcb ??= pcbTexture(); SHARED.pcbDark ??= pcbTexture('#12301f', '#1d4a30');
+  const { brushed, grain } = SHARED;
   return {
-    steel: std({ color: 0x8f969e, metalness: 0.85, roughness: 0.45 }),
-    steelDark: std({ color: 0x4a5058, metalness: 0.8, roughness: 0.5 }),
-    zinc: std({ color: 0x6f767e, metalness: 0.75, roughness: 0.55 }),
+    steel: std({ color: 0x9aa1a9, metalness: 0.9, roughness: 0.55, roughnessMap: brushed, bumpMap: brushed, bumpScale: 0.25 }),
+    steelDark: std({ color: 0x4a5058, metalness: 0.85, roughness: 0.6, roughnessMap: brushed }),
+    zinc: std({ color: 0x7b828a, metalness: 0.8, roughness: 0.65, roughnessMap: brushed }),
     black: std({ color: 0x121418, metalness: 0.35, roughness: 0.6 }),
     blackGloss: std({ color: 0x0b0c0f, metalness: 0.6, roughness: 0.28 }),
-    plastic: std({ color: 0x1b1e23, metalness: 0.0, roughness: 0.75 }),
+    plastic: std({ color: 0x1b1e23, metalness: 0.0, roughness: 0.8, roughnessMap: grain, bumpMap: grain, bumpScale: 0.15 }),
     blue: std({ color: 0x1f6fff, metalness: 0.1, roughness: 0.45 }),
     ibmBlue: std({ color: 0x0f62fe, emissive: 0x0f62fe, emissiveIntensity: 1.6, roughness: 0.4 }),
-    pcb: std({ color: 0x0f4a2c, metalness: 0.15, roughness: 0.55 }),
-    pcbDark: std({ color: 0x10261c, metalness: 0.15, roughness: 0.6 }),
+    pcb: std({ color: 0xffffff, map: SHARED.pcb, metalness: 0.2, roughness: 0.42 }),
+    pcbDark: std({ color: 0xffffff, map: SHARED.pcbDark, metalness: 0.2, roughness: 0.45 }),
+    white: std({ color: 0xe6e8ea, metalness: 0.0, roughness: 0.6 }),
+    copperDark: std({ color: 0xa85a2a, metalness: 1.0, roughness: 0.4, roughnessMap: brushed }),
+    substrate: std({ color: 0x1c3d33, metalness: 0.25, roughness: 0.5 }),
     chip: std({ color: 0x0c0d0f, metalness: 0.2, roughness: 0.4 }),
     gold: std({ color: 0xd9a441, metalness: 1.0, roughness: 0.3 }),
-    copper: std({ color: 0xc8733a, metalness: 1.0, roughness: 0.28 }),
+    copper: std({ color: 0xc8733a, metalness: 1.0, roughness: 0.34, roughnessMap: brushed }),
     nickel: std({ color: 0xc9c2b4, metalness: 0.95, roughness: 0.3 }),
-    alu: std({ color: 0xd4d8dd, metalness: 0.9, roughness: 0.35 }),
+    alu: std({ color: 0xd4d8dd, metalness: 0.95, roughness: 0.45, roughnessMap: brushed }),
     hose: std({ color: 0x17181b, metalness: 0.0, roughness: 0.85 }),
     hoseBlue: std({ color: 0x1b5fd9, metalness: 0.0, roughness: 0.6 }),
     hoseRed: std({ color: 0xc8322b, metalness: 0.0, roughness: 0.6 }),
@@ -304,7 +378,7 @@ export function makePalette() {
     led: std({ color: 0x39d98a, emissive: 0x39d98a, emissiveIntensity: 2.0 }),
     perf: std({ color: 0x15171b, metalness: 0.7, roughness: 0.5, alphaMap: perf, alphaTest: 0.5, side: THREE.DoubleSide }),
     perfSteel: std({ color: 0x565c64, metalness: 0.85, roughness: 0.45, alphaMap: perf, alphaTest: 0.5, side: THREE.DoubleSide }),
-    cover: std({ color: 0x2a2c2f, metalness: 0.25, roughness: 0.7 }),
+    cover: std({ color: 0x2a2c2f, metalness: 0.25, roughness: 0.8, roughnessMap: grain, bumpMap: grain, bumpScale: 0.1 }),
     coverBlack: std({ color: 0x0d0e10, metalness: 0.3, roughness: 0.6 }),
     facetDark: std({ color: 0x17181b, metalness: 0.5, roughness: 0.45, side: THREE.DoubleSide }),
     facetLight: std({ color: 0x74777c, metalness: 0.55, roughness: 0.5, side: THREE.DoubleSide }),

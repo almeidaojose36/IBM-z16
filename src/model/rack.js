@@ -49,7 +49,14 @@ function buildIoDrawer(P) {
     c.add(box(0.19, 0.0016, 0.24, P.pcb, 0, -0.006, 0.122));
     c.add(box(0.008, 0.018, 0.008, P.blue, s * 0.092, 0, -0.004));
     if (kind === 'crypto') c.add(box(0.09, 0.014, 0.12, P.steelDark, -0.02, 0.002, 0.10, 'HSM (tamper-responding enclosure)'), box(0.03, 0.01, 0.03, P.yellow, 0.06, 0, 0.06, 'Battery'));
-    else c.add(box(0.04, 0.008, 0.04, P.chip, 0, -0.001, 0.12), box(0.06, 0.012, 0.03, P.alu, 0, 0.001, 0.05));
+    else {
+      c.add(box(0.04, 0.006, 0.04, P.chip, 0, -0.002, 0.12, 'Controller'), box(0.022, 0.004, 0.022, P.chip, 0.055, -0.003, 0.16), box(0.022, 0.004, 0.022, P.chip, -0.055, -0.003, 0.16));
+      for (let k = 0; k < 9; k++) c.add(box(0.05, 0.011, 0.0016, P.alu, 0, 0.0005, 0.105 + k * 0.004, 'Heat sink fin'));
+      const n = kind === 'fc' ? 4 : 2;
+      for (let k = 0; k < n; k++) c.add(box(0.016, 0.011, 0.05, P.zinc, (k - (n - 1) / 2) * 0.03, 0.0005, 0.028, 'Transceiver cage'));
+      for (let k = 0; k < 5; k++) c.add(cyl(0.003, 0.008, P.alu, -0.07 + k * 0.012, -0.001, 0.2, 'y', 'Capacitor'));
+    }
+    c.add(box(0.12, 0.0018, 0.008, P.gold, 0, -0.006, 0.243, 'Edge connector'));
     c.position.set(s * 0.115, y0 + i * slotH, ZR);
     c.userData.kind = kind;
     root.add(c); refs.cards.push(c);
