@@ -7,7 +7,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { openStage, parseArgs } from './browser.mjs';
 
-const o = parseArgs({ width: 1920, height: 1080, fps: 30, out: 'out/z16-teardown.mp4', from: 0, to: -1, crf: 16, gpu: false });
+const o = parseArgs({ width: 1920, height: 1080, fps: 30, out: 'out/z16-teardown.mp4', from: 0, to: -1, crf: 16, gpu: false, scale: 1 });
 fs.mkdirSync(path.dirname(o.out), { recursive: true });
 
 const { page, close } = await openStage(o);

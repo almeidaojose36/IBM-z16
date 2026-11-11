@@ -245,9 +245,9 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   // ------------------------------------------------------------ transistor close-up
   const dFin = dip(S('x1') + 8.6), dFinBack = dip(CH('ai') - 0.45);
   const wires = group('Wiring levels');
-  const cu = new THREE.MeshStandardMaterial({ color: 0xc8733a, metalness: 1, roughness: 0.3 });
-  for (let i = 0; i < 6; i++) wires.add(box(0.1, 0.07, 3.0, cu, (i - 2.5) * 0.42, 1.25, 0));
-  for (let i = 0; i < 5; i++) wires.add(box(3.0, 0.08, 0.14, cu, 0, 1.5, (i - 2) * 0.55));
+  const copper = new THREE.MeshStandardMaterial({ color: 0xc8733a, metalness: 1, roughness: 0.3 });
+  for (let i = 0; i < 6; i++) wires.add(box(0.1, 0.07, 3.0, copper, (i - 2.5) * 0.42, 1.25, 0));
+  for (let i = 0; i < 5; i++) wires.add(box(3.0, 0.08, 0.14, copper, 0, 1.5, (i - 2) * 0.55));
   finfet.group.add(wires);
   tl.hook((t) => {
     const k = pulse(t, S('x4b') + 0.6, 2.2, dFinBack, 0.1);
@@ -338,16 +338,16 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   cam.to(S('h1') + 0.5, 5, rd([0.22, 0.2, 0.36]), rd([0, 0.04, 0]));
   cam.to(S('h2'), E('h2') - S('h2'), rd([0.3, 0.3, 0.55]), rd([0.04, 0.2, -0.2]));
   const dZ = dip(S('h3') - 0.45);
-  cam.cut(dZ, [-3.2, 1.2, 5.2], [0, 1.05, 0]);
-  cam.to(dZ + 0.1, N('h3b') - dZ, [2.6, 1.5, 5.6], [0, 1.0, 0]);
-  cam.to(S('h4'), 9, [3.6, 1.7, 3.6], [-0.2, 1.0, 0]);
-  cam.to(S('h5'), 8, [1.6, 1.25, 5.8], [-0.9, 1.05, 0]);
+  cam.cut(dZ, [-2.4, 1.2, 4.2], [0, 1.05, 0]);
+  cam.to(dZ + 0.1, N('h3b') - dZ, [2.0, 1.4, 4.4], [0, 1.0, 0]);
+  cam.to(S('h4'), 9, [2.9, 1.5, 3.0], [0.3, 1.0, 0]);
+  cam.to(S('h5'), 8, [1.3, 1.2, 4.7], [-0.8, 1.05, 0]);
   // frame
   cam.to(CH('frame') + 1, 3.5, [-0.7, 1.75, 2.1], [0, 1.6, 0.6]);
   cam.to(S('f1') + 1.5, E('f1') - S('f1'), [-0.75, 0.95, 2.3], [0, 0.9, 0.6]);
-  cam.to(S('f2') - 0.3, 3.5, [-2.6, 1.4, 5.4], [0.3, 1.0, 0]);
-  cam.to(S('f2b'), N('f2b') - S('f2b'), [-3.9, 1.5, 3.9], [0.3, 1.0, 0]);
-  cam.to(S('f3'), 3, [1.0, 1.7, 8.2], [0.3, 0.95, 0]);
+  cam.to(S('f2') - 0.3, 3.5, [-2.1, 1.3, 4.4], [0.3, 1.0, 0]);
+  cam.to(S('f2b'), N('f2b') - S('f2b'), [-3.1, 1.4, 3.2], [0.3, 1.0, 0]);
+  cam.to(S('f3'), 3, [0.9, 1.5, 6.3], [0.3, 0.95, 0]);
   cam.to(S('f4') - 0.3, 3.2, [2.3, 1.4, 4.9], [-0.4, 1.0, 0]);
   cam.to(S('f5') - 0.6, 2.6, [1.15, 1.9, 2.5], [-0.25, 1.78, 0.2]);
   cam.to(S('f7') - 0.5, 2.4, [1.2, 1.75, 2.8], [-0.3, 1.5, 0.2]);
@@ -402,7 +402,7 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   // the module
   cam.cut(dBench2, add(C, [0.6, 0.55, 0.5]), add(C, [-0.1, -0.03, -0.1]));
   cam.to(S('p2'), 3, add(M, [0.17, 0.14, 0.24]), add(M, [-0.03, -0.02, 0]));
-  cam.to(S('p2') + 4.4, 2, add(M, [0.14, 0.03, 0.22]), add(M, [-0.025, 0.02, 0]));
+  cam.to(S('p2') + 4.4, 2, add(M, [0.12, 0.16, 0.2]), add(M, [-0.02, 0.02, 0]));
   cam.to(S('p2b') + 0.2, 2.4, add(M, [0.12, 0.13, 0.2]), add(M, [-0.02, -0.14, 0]));
   cam.to(S('p3') - 0.4, 2.6, add(M, [0.08, 0.115, 0.13]), add(M, [-0.012, -0.012, 0]));
   cam.to(S('p4') - 0.2, 4, add(M, [0.25, 0.22, 0.34]), add(M, [-0.02, -0.16, 0]));
@@ -421,9 +421,9 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   cam.to(S('x1') + 4.6, 4, ...top(cu, cv, 0.0016));
   cam.cut(dFin, ff([2.6, 2.4, 3.4]), ff([0, 0.3, 0]));
   cam.to(dFin + 0.1, N('x1') - dFin, ff([1.9, 1.5, 2.3]), ff([0, 0.3, 0]));
-  cam.to(S('x2') - 0.2, 3, ff([0.95, 0.95, 1.05]), ff([0, 0.42, 0]));
-  cam.to(S('x3') + 0.4, 3, ff([0.75, 0.82, 0.62]), ff([0, 0.45, 0]));
-  cam.to(S('x4') + 2, 4, ff([1.7, 1.35, 1.9]), ff([0, 0.35, 0]));
+  cam.to(S('x2') - 0.2, 3, ff([1.7, 1.6, 2.2]), ff([0, 0.4, 0]));
+  cam.to(S('x3') + 0.4, 3, ff([1.3, 1.35, 1.6]), ff([0, 0.45, 0]));
+  cam.to(S('x4') + 2, 4, ff([2.3, 1.9, 2.9]), ff([0, 0.35, 0]));
   cam.to(S('x4b'), 3, ff([2.1, 2.3, 2.6]), ff([0, 0.7, 0]));
   cam.to(S('x5'), N('x5') - S('x5') - 0.5, ff([2.9, 5.2, 3.6]), ff([0, 0.6, 0]));
   // the fraud check
@@ -437,13 +437,13 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   cam.to(S('s4') - 0.2, 3, add(C, [0.5, 0.55, -1.0]), add(C, [-0.05, -0.02, -0.25]));
   cam.cut(dHome3, [1.15, 1.0, -2.4], [0.2, 0.8, -0.42]);
   cam.to(S('s4b'), N('s4b') - S('s4b'), [2.9, 1.3, -1.5], [0.2, 0.8, 0]);
-  cam.to(S('s5') - 0.3, 3.4, [1.8, 1.7, 8.4], [0.35, 0.95, 0]);
-  cam.to(S('s6'), N('s7') - S('s6'), [0.2, 1.5, 8.8], [0.35, 1.0, 0]);
+  cam.to(S('s5') - 0.3, 3.4, [1.5, 1.5, 6.4], [0.35, 0.95, 0]);
+  cam.to(S('s6'), 4, [-0.4, 1.4, 6.6], [1.3, 1.0, 0]);
   // never stop
   cam.to(CH('never') + 0.8, 3.4, [2.0, 1.35, 4.3], [-0.45, 1.0, 0]);
   cam.to(S('r2'), N('r2') - S('r2'), [1.7, 1.3, 3.9], [-0.4, 1.0, 0]);
   cam.to(S('r3') - 0.2, 3, [2.3, 1.1, 3.4], [-0.1, 0.72, 0.6]);
-  cam.to(S('r3b') - 0.2, 3.4, [2.0, 1.9, 8.8], [2.0, 0.95, 0]);
+  cam.to(S('r3b') - 0.2, 3.4, [2.0, 1.6, 7.6], [2.0, 0.95, 0]);
   cam.to(S('r4') - 0.2, 3.4, [2.1, 1.35, 4.6], [-0.4, 1.0, 0]);
   // approved
   cam.to(CH('close') + 0.8, 3.6, [1.3, 1.35, -3.1], [0.25, 1.1, -0.4]);
@@ -451,9 +451,9 @@ export function buildStory({ rack, palettes, reader, finfet, packet, shells, sce
   const dR = dip(S('z3') - 0.45);
   cam.cut(dR, rd([0.24, 0.2, 0.38]), rd([0, 0.04, 0]));
   cam.to(dR + 0.1, N('z3') - dR, rd([0.14, 0.17, 0.26]), rd([0, 0.045, -0.01]));
-  cam.cut(dClose, [-3.6, 1.3, 7.4], [0.3, 1.0, 0]);
-  cam.to(dClose + 0.1, N('z4') - dClose, [1.2, 1.5, 8.6], [0.3, 1.0, 0]);
-  cam.to(S('z5'), N('z5') - S('z5') + 6, [4.4, 1.8, 7.4], [0.3, 1.0, 0]);
+  cam.cut(dClose, [-2.8, 1.3, 5.6], [0.3, 1.0, 0]);
+  cam.to(dClose + 0.1, N('z4') - dClose, [1.0, 1.4, 6.6], [0.3, 1.0, 0]);
+  cam.to(S('z5'), N('z5') - S('z5') + 6, [3.6, 1.6, 5.8], [0.3, 1.0, 0]);
   cam.finish();
 
   // ------------------------------------------------------------ on-screen text

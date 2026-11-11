@@ -6,7 +6,7 @@ import { box, cyl, group, glowTexture, screenTexture, coreDetailTexture } from '
 /** Payment terminal and card on a counter. Origin at the centre of the counter top. */
 export function buildReader(P) {
   const root = group('Card reader set');
-  root.add(box(2.4, 0.06, 1.4, P.blackGloss, 0, -0.03, 0, 'Counter'));
+  root.add(box(2.4, 0.06, 1.4, P.plastic, 0, -0.03, 0, 'Counter'));
   const term = group('Payment terminal');
   term.add(box(0.085, 0.022, 0.17, P.plastic, 0, 0.011, 0));
   term.add(box(0.079, 0.004, 0.164, P.blackGloss, 0, 0.024, 0));

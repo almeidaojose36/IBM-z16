@@ -319,7 +319,7 @@ export function buildRack(R, DP, HP) {
     refs.ioPath.push(pts);
   }
   const osa = io.refs.card('osa', 1);
-  refs.fiberPts = [[0.19, H + 0.5, -D / 2 - 0.25], [0.2, H - 0.15, -D / 2 - 0.12], [0.21, ioY + osa.position.y + 0.25, ioZ - 0.10], [osa.position.x + 0.03, ioY + osa.position.y + 0.03, ioZ - 0.06], [osa.position.x + 0.03, ioY + osa.position.y, ioZ]];
+  refs.fiberPts = [[0.19, H + 0.02, -0.40], [0.2, H - 0.22, -0.46], [0.21, ioY + osa.position.y + 0.25, ioZ - 0.14], [osa.position.x + 0.03, ioY + osa.position.y + 0.03, ioZ - 0.06], [osa.position.x + 0.03, ioY + osa.position.y, ioZ]];
   ioc.add(hose(refs.fiberPts, 0.004, R.aqua, 'Fiber (network)'));
   root.add(ioc);
   refs.ioCables = ioc;

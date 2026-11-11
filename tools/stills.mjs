@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { openStage, parseArgs } from './browser.mjs';
 
-const o = parseArgs({ width: 1920, height: 1080, times: '3,16,29,37,45,55,63,70,77,93', dir: 'out/stills', gpu: false });
+const o = parseArgs({ width: 1920, height: 1080, times: '3,16,29,37,45,55,63,70,77,93', dir: 'out/stills', gpu: false, scale: 1 });
 fs.mkdirSync(o.dir, { recursive: true });
 const { page, close } = await openStage(o);
 for (const t of String(o.times).split(',').map(Number)) {

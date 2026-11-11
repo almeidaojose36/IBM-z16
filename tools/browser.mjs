@@ -12,7 +12,7 @@ function loadPlaywright() {
 }
 
 /** Opens the teardown page in render mode at the given size and waits until the scene is built. */
-export async function openStage({ width, height, gpu = false }) {
+export async function openStage({ width, height, gpu = false, scale = 1 }) {
   const { chromium } = loadPlaywright();
   const server = await serve(0);
   const port = server.address().port;
@@ -21,8 +21,8 @@ export async function openStage({ width, height, gpu = false }) {
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.on('pageerror', (e) => console.error('[page error]', e.message));
   page.on('console', (m) => { if (m.type() === 'error') console.error('[console]', m.text()); });
-  await page.goto(`http://127.0.0.1:${port}/?render`);
-  await page.waitForFunction('window.__ready === true', null, { timeout: 120000 });
+  await page.goto(`http://127.0.0.1:${port}/?render&scale=${scale}`);
+  await page.waitForFunction('window.__ready === true', null, { timeout: 25000 });
   await page.evaluate(() => document.fonts.ready);
   const close = async () => { await browser.close(); server.close(); };
   return { page, close };

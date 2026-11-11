@@ -3,7 +3,8 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { makePalette } from './kit.js';
-import { buildRack } from './model/rack.js';
+import { buildRack, buildShell } from './model/rack.js';
+import { buildReader, buildFinfet, buildPacket } from './model/extras.js';
 import { buildStory, DURATION, FOV } from './story.js';
 import { pulse } from './timeline.js';
 
@@ -35,7 +36,7 @@ const rim = new THREE.DirectionalLight(0x7aa7ff, 1.3);
 rim.position.set(-4, 3, -5);
 scene.add(key, rim, new THREE.HemisphereLight(0xcfd8e6, 0x10131a, 0.35));
 
-const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshStandardMaterial({ color: 0x161a21, roughness: 0.9, metalness: 0.0 }));
+const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), new THREE.MeshLambertMaterial({ color: 0x323a47 })); // matte: far cheaper than PBR over this many pixels
 floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 floor.name = 'Studio floor';
@@ -48,8 +49,18 @@ palettes.hero.cover = palettes.cover.cover;
 const rack = buildRack(palettes.rack, palettes.doors, palettes.hero);
 scene.add(rack.group);
 
-const story = buildStory({ rack, palettes });
-const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.01, 60);
+// extra frames of a four-frame system, the card reader, the transistor patch and the payment light
+palettes.ext = makePalette();
+const shells = ['Z frame', 'B frame', 'C frame'].map((n) => { const s = buildShell(palettes.ext, n); s.visible = false; scene.add(s); return s; });
+const reader = buildReader(makePalette());
+reader.group.position.set(60, 0.9, 0);
+const finfet = buildFinfet();
+finfet.group.position.set(-60, 0, 0);
+const packet = buildPacket();
+scene.add(reader.group, finfet.group, packet);
+
+const story = buildStory({ rack, palettes, reader, finfet, packet, shells, scene });
+const camera = new THREE.PerspectiveCamera(FOV, 16 / 9, 0.01, 80);
 const controls = new OrbitControls(camera, canvas);
 controls.enabled = false;
 
@@ -74,12 +85,54 @@ for (const c of story.callouts) {
   overlay.append(c.el); lines.append(c.line, c.dot);
 }
 
+// side lists and the partition grid
+for (const l of story.lists) {
+  l.el = document.createElement('div'); l.el.className = 'hudlist';
+  l.el.innerHTML = '<h4></h4>' + l.items.map(() => '<div class="item"></div>').join('');
+  l.el.children[0].textContent = l.title;
+  l.items.forEach(([, text], i) => { l.el.children[i + 1].textContent = text; });
+  overlay.append(l.el);
+}
+const gridEl = $('grid');
+gridEl.children[0].textContent = story.grid.title;
+for (let i = 0; i < 85; i++) gridEl.children[1].append(document.createElement('i'));
+const cells = [...gridEl.children[1].children];
+
 function updateOverlay(t) {
   const W = stage.clientWidth, H = stage.clientHeight, u = H / 100;
-  setBlock($('title'), story.title, fadeK(t, story.title));
+  const tt = t < story.end.t0 ? story.title : story.end;
+  setBlock($('title'), tt, fadeK(t, tt));
   const cap = story.captions.find((c) => t >= c.t0 && t <= c.t1);
   setBlock($('caption'), cap, cap ? fadeK(t, cap) : 0);
   $('shade').style.opacity = cap ? fadeK(t, cap) : 0;
+  // fades through black
+  let black = t < 1 ? 1 - t : t > DURATION - 1.5 ? (t - DURATION + 1.5) / 1.5 : 0;
+  for (const d of story.dips) black = Math.max(black, pulse(t, d - 0.4, 0.38, d + 0.02, 0.38));
+  $('black').style.opacity = black;
+  // chapter card and tag
+  const ch = story.chapters.find((c) => t >= c.t0 && t <= c.t1), cur = [...story.chapters].reverse().find((c) => t >= c.t1);
+  const ck = ch ? pulse(t, ch.t0 + 0.2, 0.5, ch.t1 - 0.6, 0.5) : 0;
+  const card = $('card'); card.style.opacity = ck;
+  if (ch && card._c !== ch) { card._c = ch; card.children[0].textContent = `Chapter ${ch.num}`; card.children[1].textContent = ch.title; }
+  if (ch) card.children[2].style.transform = `scaleX(${pulse(t, ch.t0 + 0.4, 1.4)})`;
+  const tag = $('tag'); tag.style.opacity = cur && !ch && t < story.end.t0 ? 0.9 : 0;
+  if (cur && tag._c !== cur) { tag._c = cur; tag.textContent = `${cur.num}  ·  ${cur.title}`; }
+  for (const l of story.lists) {
+    const k = t >= l.t0 && t <= l.t1 ? fadeK(t, l) : 0;
+    l.el.style.opacity = k; l.el.style.display = k > 0.001 ? '' : 'none';
+    l.items.forEach(([ti], i) => { const e = l.el.children[i + 1], a = pulse(t, ti, 0.35); e.style.opacity = a; e.style.transform = `translateX(${(1 - a) * 3 * u}px)`; });
+  }
+  const G = story.grid, gk = t >= G.t0 && t <= G.t1 ? fadeK(t, G) : 0;
+  gridEl.style.opacity = gk; gridEl.style.display = gk > 0.001 ? '' : 'none';
+  if (gk > 0.001) {
+    const n = Math.floor(85 * Math.min(1, Math.max(0, (t - G.fill[0]) / (G.fill[1] - G.fill[0])))), grouped = t >= G.groupsAt;
+    cells.forEach((c, i) => {
+      const gdef = G.groups.find(([a, b]) => i >= a && i < b), crashed = i === G.crash[1] && t >= G.crash[0] && t < G.crash[0] + 4;
+      c.style.opacity = i < n ? 1 : 0.12;
+      c.style.background = crashed ? (Math.sin(t * 14) > 0 ? '#ff3b30' : '#5a1512') : grouped ? gdef[3] : '#8fa3bf';
+    });
+    [...gridEl.children[2].children].forEach((e, i) => { e.style.opacity = grouped ? pulse(t, G.groupsAt + i * 0.5, 0.5) : 0; });
+  }
   for (const c of story.callouts) {
     const k = t >= c.t0 && t <= c.t1 ? fadeK(t, c) : 0;
     const show = k > 0.001;
@@ -109,7 +162,7 @@ function setTime(t) {
     camera.lookAt(c.look);
     // keep depth precision from the whole frame down to a 23 mm die
     const d = c.pos.distanceTo(c.look);
-    camera.near = Math.max(0.002, d * 0.04); camera.far = 60;
+    camera.near = Math.max(0.0004, d * 0.04); camera.far = 80;
     camera.updateProjectionMatrix();
   }
   camera.updateMatrixWorld();
@@ -120,7 +173,8 @@ function setTime(t) {
 
 function resize() {
   const w = stage.clientWidth, h = stage.clientHeight;
-  renderer.setPixelRatio(RENDER ? 1 : Math.min(devicePixelRatio, 2));
+  // ?scale=0.8 renders the 3D at 80% and lets the browser upscale it; text stays sharp
+  renderer.setPixelRatio(RENDER ? Number(params.get('scale') ?? 1) : Math.min(devicePixelRatio, 2));
   renderer.setSize(w, h, false);
   camera.aspect = w / h; camera.updateProjectionMatrix();
   lines.setAttribute('viewBox', `0 0 ${w} ${h}`);
@@ -148,6 +202,7 @@ window.__exportGlb = async (t = 0) => {
   return btoa(s);
 };
 window.__scene = { scene, camera, rack, story };
+window.__sfx = story.sfx;
 // exterior still from an arbitrary camera, overlay hidden, stage filling the viewport
 window.__beauty = (pos, look) => {
   stage.style.cssText = 'width:100vw;height:100vh;left:0;top:0;transform:none';
